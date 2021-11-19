@@ -2,216 +2,285 @@ import datetime
 import time
 import mido
 from Event import *
-from EventQueue import EventQueue
+from PatchQueue import PatchQueue, SINK_POINT, SOURCE_POINT
 from TimeKeeper import TimeKeeper
 from TransposeModule import TransposeModule
+from StrumArpeggiator import StrumArpeggiator
+from StrumPattern import StrumPattern
 
+
+
+
+class TimerStep:
+    def __init__(self, clock, point):
+        self.last_pulse = -1
+        self.clock = clock
+        self.point = point
+        self.clock.reset()
+
+    def process(self):
+        pulse = self.clock.update()
+        if pulse == self.last_pulse:
+            return False
+        self.point.add_first((EVENT_PULSE,pulse))
+        if 0 == pulse % 24:
+            self.point.add_first((EVENT_TEMPO,pulse))
+        if 0 == pulse % 96:
+            self.point.add_first((EVENT_MEASURE,pulse))
+        self.last_pulse = pulse
+        return True
 
 
 
 class DebugModule:
+    def __init__(self, q, sinkName):
+        q.createSink(sinkName, self)
+
     def handle(self, event):
         if event[0] != EVENT_PULSE:
             print(datetime.datetime.now(), event)
         return EVENT_CONTINUE
 
 
+
+class MidiInputStep:
+    def __init__(self, q, point, port):
+        self.port = port
+        self.point = q.createSource(point)
+    
+
+    def process(self):
+        new_events = False
+        if self.port:
+            for msg in self.port.iter_pending():
+                 if self.point:
+                     self.point.add((EVENT_MIDI,self.point.name,msg))
+                     new_events = True
+        return new_events
+
+
+
 class MidiOutModule:
-    def __init__(self, midiOutputs):
-        self.midiOutputs = midiOutputs
+    def __init__(self, q, sink, port):
+        q.createSink(sink, self)
+        self.port = port
 
     def handle(self, event):
-        if EVENT_MIDI_OUT == event[0]:
-            p = event[1]
-            msg = event[2]
+        if EVENT_MIDI != event[0]:
+            return
+        msg = event[2]
+        if self.port:
+            self.port.send(msg)
+        return EVENT_DONE
 
-            if p < len(self.midiOutputs):
-                self.midiOutputs[p].send(msg)
-                return EVENT_DONE
-        return EVENT_CONTINUE
 
 
 class PassthroughModule:
-    def __init__(self, midi_in, midi_out, queue=None, port=None):
-        self.queue = queue
-        self.input_num = midi_in
-        self.output_num = midi_out
-        self.output_port = port
+    def __init__(self, q, sink, source):
+        q.createSink(sink, self)
+        self.output_point = q.createSource(source)
 
     def handle(self, event):
-        if event[0] != EVENT_MIDI_IN:
+        if event[0] != EVENT_MIDI:
             return EVENT_CONTINUE
         source = event[1]
         msg = event[2]
-        if source != self.input_num:
-            return EVENT_CONTINUE
-        # if we have a port send immediately else queue
-        if self.output_port:
-            self.output_port.send(msg)
-        if self.queue:
-            self.queue.add((EVENT_MIDI_OUT,self.output_num,msg))
+        if self.output_point:
+            self.output_point.add((EVENT_MIDI, self.output_point.name, msg))
         return
 
-
-class StrumModule:
-    def __init__(self, clock, midi_in, midi_out, queue, minor=False):
-        self.queue = queue
-        self.clock = clock
-        self.input_num = midi_in
-        self.output_num = midi_out
-        self.minor = minor
-
-    def handle(self, event):
-        if event[0] != EVENT_MIDI_IN:
-            return EVENT_CONTINUE
-        source = event[1]
-        msg = event[2]
-        if source != self.input_num:
-            return EVENT_CONTINUE
-        
-        if msg.type == 'note_on' or msg.type == 'note_off':
-            I = msg.copy(note=msg.note+0)
-            III = msg.copy(note=msg.note+(3 if self.minor else 4))
-            V = msg.copy(note=msg.note+7)
-            VIII = msg.copy(note=msg.note+12)
-            speed = 3
-            if (msg.type == 'note_off'):
-                self.queue.remove_all(lambda e : e[0] == EVENT_MIDI_OUT and e[1] == self.output_num and e[2].type == 'note_on')
-                self.queue.add((EVENT_MIDI_OUT, self.output_num, I))
-                self.queue.add((EVENT_MIDI_OUT, self.output_num, III))
-                self.queue.add((EVENT_MIDI_OUT, self.output_num, V))
-                self.queue.add((EVENT_MIDI_OUT, self.output_num, VIII))
-            else:
-                # find place in measure
-                if self.clock.get_time() % 24 < 12:
-                    self.queue.delay((EVENT_MIDI_OUT, self.output_num, I),  0*speed)
-                    self.queue.delay((EVENT_MIDI_OUT, self.output_num, III),1*speed)
-                    self.queue.delay((EVENT_MIDI_OUT, self.output_num, V), 2*speed)
-                    self.queue.delay((EVENT_MIDI_OUT, self.output_num, VIII), 3*0*speed)
-                else:
-                    self.queue.delay((EVENT_MIDI_OUT, self.output_num, VIII),  0*speed)
-                    self.queue.delay((EVENT_MIDI_OUT, self.output_num, V),1*speed)
-                    self.queue.delay((EVENT_MIDI_OUT, self.output_num, III), 2*speed)
-                    self.queue.delay((EVENT_MIDI_OUT, self.output_num, I), 3*0*speed)
-        else:
-            self.queue.add((EVENT_MIDI_OUT, self.output_num, msg))
-        return
-
-
-class StrumPattern:
-    def __init__(self, midi_in, midi_out, queue):
-        self.queue = queue
-        self.input_num = midi_in
-        self.output_num = midi_out
-        self.current_msg = None
-        if midi_in == midi_out:
-            raise
-
-
-    def handle(self, event):
-
-        if event[0] == EVENT_MIDI_IN:
-            source = event[1]
-            msg = event[2]
-            if source != self.input_num:
-                return EVENT_CONTINUE
-            if msg.type == 'note_on':
-                self.current_msg = msg
-            if msg.type == 'note_off':
-                if self.current_msg and self.current_msg.note == msg.note:
-                    self.current_msg = None
-            return EVENT_DONE
-        
-        if event[0] == EVENT_MEASURE:
-            if not self.current_msg or self.current_msg.type != 'note_on':
-                return EVENT_CONTINUE            
-            msg = self.current_msg
-            # send a measure worth of notes            
-            self.queue.delay((EVENT_MIDI_IN, self.output_num, msg), 0)  # D
-            self.queue.delay((EVENT_MIDI_IN, self.output_num, msg), 24) # D
-            self.queue.delay((EVENT_MIDI_IN, self.output_num, msg), 36) # U
-            self.queue.delay((EVENT_MIDI_IN, self.output_num, msg), 60) # U
-            self.queue.delay((EVENT_MIDI_IN, self.output_num, msg), 72) # D
-            self.queue.delay((EVENT_MIDI_IN, self.output_num, msg), 84) # U
-            off = mido.Message('note_off', note=msg.note)
-            self.queue.delay((EVENT_MIDI_IN, self.output_num, off), 90) # U
-        
-        return EVENT_CONTINUE 
 
 
 class Application:
 
-    def __init__(self):        
+    def __init__(self):
         self.ppqClock = TimeKeeper(120)
         self.lastPulse = -1
-        self.eventQueue = EventQueue(self.ppqClock)
-        self.eventHandlers = []
-        self.midiInputPorts = []
-        self.midiOutputPorts = []
+        self.patchQueue = PatchQueue(self.ppqClock)
+        self.steps = []
         return
 
-
-    def process_inputs(self):
-        for i in range(0,len(self.midiInputPorts)):
-            port = self.midiInputPorts[i]
-            for msg in port.iter_pending():
-                self.eventQueue.add((EVENT_MIDI_IN,i,msg))
-        return
-
-
-    def update_timers(self):
-        pulse = self.ppqClock.update()
-        if pulse != self.lastPulse:
-            self.eventQueue.add_first((EVENT_PULSE,pulse))
-            if 0 == pulse % 24:
-                self.eventQueue.add_first((EVENT_TEMPO,pulse,))
-            if 0 == pulse % 96:
-                self.eventQueue.add_first((EVENT_MEASURE,pulse))
-            self.lastPulse = pulse
-        return
 
 
     def process_events(self):
-        event = self.eventQueue.get()
-        while event:
-            # fake loop to break out of (does python have named blocked?)
-            while True:
-                for eventHandler in self.eventHandlers:
-                    ret = eventHandler.handle(event)
-                    if ret == EVENT_DONE:
-                        break
-                break
-            event = self.eventQueue.get()
+        while self.patchQueue.process():
+            pass
         return
 
 
+    def source(self, name):
+        p = self.patchQueue.createPoint(name, SOURCE_POINT)
+        return p
+
+
+    def sink(self, name, handler=None):
+        p = self.patchQueue.createPoint(name, SINK_POINT, handler)
+        return p
+
+
+    def patch(self, src, dst):
+        self.patchQueue.createPatch(src, dst)
+
+
+    def open_midi_sink(self, device):
+        if type(device) == type(''):
+            for name in mido.get_input_names():
+                if name.startswith(device):
+                    device = name
+                    break
+        elif type(device) == type(1):
+            device = mido.get_input_names()[device]
+        port = mido.open_output(device)
+        return MidiOutModule(port)
+
+
+
+    def findMidiInputs(self):
+        q = self.patchQueue
+        names = mido.get_input_names()
+        keyboardName = None
+
+        # create "keyboard" source
+
+        for n in names:
+            if n.startswith("Arturia KeyStep"):
+                keyboardName = n
+                break
+        
+        if not keyboardName: 
+            for n in names:
+                if n.startswith("mio:"):
+                    keyboardName = n
+                    break
+
+        self.patchQueue.createSource("keyboard")
+        if keyboardName:
+            print("opening '" + keyboardName + "' as 'keyboard'")
+            step = MidiInputStep(q, "keyboard", mido.open_input(keyboardName))
+            self.steps.append(step)
+
+        # look for fighter twister
+
+        twisterDevice = None
+        for n in names:
+            if n.startswith("Midi Fighter Twister:"):
+                twisterDevice = n
+        self.patchQueue.createSource("knobs")
+        if twisterDevice:
+            print("opening '" + twisterDevice + "' as 'knobs'")
+            step = MidiInputStep(q, "knobs", mido.open_input(twisterDevice))
+            self.steps.append(step)
+
+        # look for novation lauchpad 
+
+        launchpadDevice = None
+        for n in names:
+            if n.startswith("Launchpad"):
+                launchpadDevice = n
+        self.patchQueue.createSource("grid")
+        if launchpadDevice:
+            print("opening '" + launchpadDevice + "' as 'grid'")
+            step = MidiInputStep(q, "grid", mido.open_input(launchpadDevice))
+            self.steps.append(step)
+
+
+    def findMidiOutputs(self):
+        q = self.patchQueue
+        names = mido.get_output_names()
+
+        instrumentName = None
+        if not instrumentName:
+            for n in names:
+                if n.startswith("Arturia MicroFreak"):
+                    instrumentName = n
+                    break
+        if not instrumentName:
+            for n in names:
+                if n.startswith("mio:"):
+                    instrumentName = n
+                    break
+
+        # create output handler for midi0
+        self.sink('instrument', None)
+        if instrumentName: 
+            print("opening '" + instrumentName + "' as 'instrument'")
+            MidiOutModule(q, 'instrument', mido.open_output(instrumentName))
+
+
     def setup(self):
-        self.midiInputPorts.append(mido.open_input(mido.get_input_names()[1]))  // mio:
-        self.midiInputPorts.append(mido.open_input(mido.get_input_names()[2]))   // Midi Fighter Twister
-        self.midiInputPorts.append(mido.open_input(mido.get_input_names()[3]))  // Lauchpad Mini:
-        self.midiOutputPorts.append(mido.open_output(mido.get_output_names()[1]))
+
+        #
+        # BUILT-IN STEPS
+        #
+        self.steps.append( TimerStep(self.ppqClock, self.source("clock")) )
+        self.steps.append( self.patchQueue )
+
+        #
+        # MIDI DEVICES
+        #
+
+        # keyboard, knobs, grid
+        self.findMidiInputs()
+
+        # instrument
+        self.findMidiOutputs()
+
+        #
+        # MODULES
+        #
+
+        q = self.patchQueue
+        StrumArpeggiator(q, 'arp_in', 'arp_out')
+        StrumPattern(q, 'rhythm_in', 'rhythm_out')
+        DebugModule(q, 'debug')
+        
+    
+        # 
+        # PATCH!
+        #
+
+        #self.patch('keyboard', 'rhythm_in')
+        self.patch('clock', 'rhythm_in')
+        self.patch('rhythm_out', 'arp_in')
+        self.patch('arp_out','instrument')
+
+        self.patch('keyboard', 'instrument')
+
+        TransposeModule(q, 't_cc', 'tc_notes', 'transpose_out')
+        self.patch('keyboard', 'debug')
+        self.patch('grid', 'debug')
+        self.patch('knobs', 'debug')
+
+        """   midi0 = 
 
         self.eventHandlers.append(DebugModule())
         self.eventHandlers.append(MidiOutModule(self.midiOutputPorts))
         #self.eventHandlers.append(PassthroughModule(0,0,port=self.midiOutputPorts[0]))
-        #self.eventHandlers.append(PassthroughModule(0,0,queue=self.eventQueue))
-        #self.eventHandlers.append(TransposeModule(1,0,100,self.eventQueue))
+        #self.eventHandlers.append(PassthroughModule(0,0,queue=self.patchQueue))
+        #self.eventHandlers.append(TransposeModule(1,0,100,self.patchQueue))
         
-        self.eventHandlers.append(StrumPattern(0, 100, queue=self.eventQueue))
+        self.eventHandlers.append(StrumPattern(0, 100, queue=self.patchQueue))
 
-        self.eventHandlers.append(StrumModule(self.ppqClock, 100, 0, queue=self.eventQueue))
+        self.eventHandlers.append(StrumModule(self.ppqClock, 100, 0, queue=self.patchQueue))
 
-        self.eventHandlers.append(TransposeModule(1,101,0,self.eventQueue))
+        self.eventHandlers.append(TransposeModule(1,101,0,self.patchQueue))
+        """
 
+        # GO!
+
+        self.patchQueue.optimize()
         self.ppqClock.reset()
+
         return
 
 
     def loop(self):
-        self.process_inputs()
-        self.update_timers()
-        self.process_events()
-        time.sleep(0.001)
+        didsomething = False
+        for step in self.steps:
+            result = step.process()
+            if result: didsomething = True
+        if not didsomething:
+            time.sleep(0.001)
         return
 
 
@@ -222,7 +291,12 @@ class Application:
         return
 
 
-print(mido.get_input_names())
+print("SOURCES")
+for name in mido.get_input_names():
+    print("  ", name)
+print("SINKS")
+for name in mido.get_output_names():
+    print("  ", name)
 
 application = Application()
 application.main()
