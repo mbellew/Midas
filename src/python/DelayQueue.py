@@ -6,13 +6,16 @@ class DelayQueue:
     EventQueue wraps a simple fifo queue and a priority queue for scheduling.  Events are removed from the scheduling
     queue based on the clock.get_time().  The queue is agnostic about the units of 'time' and what an 'event' looks like.
     """
-    def __init__(self, clock):
+    def __init__(self):
         self.fifo = []
         self.scheduled = []
         self.event_counter = 0
-        self.clock = clock
+        self.time = -1
         self.deleted_event = "~~~THIS EVENT HAS BEEN DELETED~~~"
         return
+
+    def set_time(self, time):
+        self.time = time
 
 
     def add_first(self, event):
@@ -27,7 +30,7 @@ class DelayQueue:
     def schedule(self, event, time):
         """Schedule this event to be returned at time 'time'"""
         self.event_counter += 1
-        heappush(self.scheduled, (time,self.event_counter,event))
+        heappush(self.scheduled, (time, self.event_counter, event))
         return
 
 
@@ -35,7 +38,7 @@ class DelayQueue:
         """Schedule this event to be returned after the delay 'current_time + delay'"""
         if delay <= 0:
             self.add(event)
-        self.schedule(event, self.clock.get_time() + delay)
+        self.schedule(event, self.time + delay)
         return
 
 
@@ -70,8 +73,7 @@ class DelayQueue:
     def _get(self):
         if 0 < len(self.fifo):
             return self.fifo.pop(0)
-        time = self.clock.get_time()
-        while 0 < len(self.scheduled) and self.scheduled[0][0] <= time:
+        while 0 < len(self.scheduled) and self.scheduled[0][0] <= self.time:
             e = heappop(self.scheduled)[2]
             if not e == self.deleted_event:
                 self.fifo.append(e)

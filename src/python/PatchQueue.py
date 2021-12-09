@@ -1,4 +1,5 @@
 from DelayQueue import DelayQueue
+from Event import EVENT_CLOCK
 
 
 SINK_POINT = 100
@@ -33,12 +34,18 @@ class PatchQueueEvent:
 
 
 class PatchQueue:
-    def __init__(self, clock):
-        self.queue = DelayQueue(clock)
-        self.points = {}
-        self.patches = {}
+    def __init__(self, clock_sink):
         self.stringType = type('')
         self.listType = type((0,1))
+        self.points = {}
+        self.patches = {}
+        self.createSink(clock_sink,self)
+        self.queue = DelayQueue()
+
+
+    def handle(self, event):
+        if EVENT_CLOCK == event.code:
+            self.queue.set_time(event.obj.time)
 
 
     def createSink(self, sink, handler):
@@ -98,21 +105,40 @@ class PatchQueue:
         self.patches[src.name].append(dst)
 
 
-    def add(self, event, point = None):
+    def add(self, event, point):
+        if type(event) == type((1,2,3)):
+            return
+        if not point:
+            return
         if self.stringType == type(point):
             point = self.createPoint(point)
+        if 0==0:
+            self.dispatchEvent(event, point)
+            return
         patchevent = PatchQueueEvent(event, point)
         self.queue.add(patchevent)
 
 
     def add_first(self, event, point = None):
+        if type(event) == type((1,2,3)):
+            return
+        if not point:
+            return
         if self.stringType == type(point):
             point = self.createPoint(point)
+        if 0==0:
+            self.dispatchEvent(event, point)
+            return
         patchevent = PatchQueueEvent(event, point)
         self.queue.add_first(patchevent)
 
 
     def delay(self, event, delay, point = None):
+        if type(event) == type((1,2,3)):
+            return
+        if not point:
+            return
+
         if self.stringType == type(point):
             point = self.createPoint(point)
         patchevent = PatchQueueEvent(event, point)
@@ -128,17 +154,18 @@ class PatchQueue:
         if not patchEvent:
             return False
         if not patchEvent.point:
-            points = self.points.values()
-        else:
-            point = patchEvent.point
-            points = None
-            if point.inout == SINK_POINT:
-                points = [point]
-            elif point.name in self.patches:
-                points = self.patches[point.name]
-
-        if not points:
             return True
-        for target in points:
-            if target.handler:
-                target.handler.handle(patchEvent.event)
+        self.dispatchEvent(patchEvent.event, patchEvent.point)
+
+
+    def dispatchEvent(self, event, point):
+        if point.handler:
+            if point.handler.handle:
+                point.handler.handle(event)
+            else:
+                point.handler(event)
+
+        if point.name in self.patches:
+            points = self.patches[point.name]
+            for p in points:
+                self.dispatchEvent(event, p)

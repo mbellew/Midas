@@ -10,7 +10,19 @@ EVENT_DELETED = -1
 EVENT_DONE = 0
 EVENT_CONTINUE = 1
 
-EVENT_PULSE=allocate_event()        # 24 per tempo
-EVENT_TEMPO=allocate_event()        # e.g 130/minute
-EVENT_MEASURE=allocate_event()      # usually 2, 3 or 4 tempo
+
+EVENT_CLOCK=allocate_event()        # ppq
 EVENT_MIDI=allocate_event()
+EVENT_KEYCHANGE=allocate_event()
+
+
+# TODO use Event class instead of tuples
+
+class Event:
+    def __init__(self, code, source, obj):
+        self.code = code
+        self.source = source
+        self.obj = obj
+
+    def __str__(self):
+        return str(self.code) + " - " + self.source + " " + str(self.obj)
