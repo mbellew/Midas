@@ -169,3 +169,22 @@ class PatchQueue:
             points = self.patches[point.name]
             for p in points:
                 self.dispatchEvent(event, p)
+
+
+
+    def printSources(self):
+        for name in self.points:
+            point = self.points[name]
+            if point.inout == SOURCE_POINT:
+                print("    " + name)
+        return
+
+    def printSinks(self):
+        for name in self.points:
+            point = self.points[name]
+            if point.inout == SINK_POINT:
+                print("    " + name)
+        return
+
+    def printPatches(self):
+        return
