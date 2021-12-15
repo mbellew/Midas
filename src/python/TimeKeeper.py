@@ -62,7 +62,7 @@ class Pulse:
 
 
 class TimeKeeper:
-    """This takes a midi clock and generates time   messages with
+    """This takes a midi clock and generates clock messages with
     beat and measure counts used.  These are the messages used internally by other modules"""
     def __init__(self, q, sink, source, sig=None):
         self.sig = sig or FOURFOUR

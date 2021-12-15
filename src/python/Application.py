@@ -7,6 +7,7 @@ from TimeKeeper import TimeKeeper, InternalClock
 from TransposeModule import TransposeModule
 from StrumArpeggiator import StrumArpeggiator
 from StrumPattern import StrumPattern
+from Rhythms import *
 
 
 __unique__ = 100
@@ -64,8 +65,7 @@ class MidiInputStep:
     def __init__(self, q, point, port, clock=None):
         self.port = port
         self.point = q.createSource(point)
-        if clock:
-            self.clock = q.createSource(clock)
+        self.clock = None if clock is None else q.createSource(clock)
     
 
     def process(self):
@@ -103,10 +103,10 @@ class MidiChannelFilter:
     def __init__(self,q,in_channel,out_channel=-1,sink_name=None,source_name=None):
         global patch_point_unique
         if not sink_name:
-            sink_name = unique_name("MidiChannelFiler_sink_")
+            sink_name = unique_name("MidiChannelFilter_sink_")
         self.sink = q.createSink(sink_name, self)
         if not source_name:
-            source_name = unique_name("MidiChannelFiler_source_")
+            source_name = unique_name("MidiChannelFilter_source_")
         self.source = q.createSource(source_name)
         self.in_channel = in_channel
         self.out_channel = in_channel if out_channel == -1 else out_channel
@@ -116,7 +116,9 @@ class MidiChannelFilter:
         if EVENT_MIDI != event.code:
             return
         msg = event.obj
-        if msg.channel != self.in_channel:
+        if msg.type != 'note_on' and msg.type != 'note_off':
+            return
+        if not msg.channel or msg.channel != self.in_channel:
             return
         out_msg = msg.copy(channel=self.out_channel)
         self.source.add(Event(EVENT_MIDI, event.source+"/"+self.name,out_msg));
@@ -214,7 +216,7 @@ class Application:
         
         if not keyboardName: 
             for n in names:
-                if n.startswith("mio:"):
+                if n.startswith("mio:") or n=="mio":
                     keyboardName = n
                     break
 
@@ -253,6 +255,7 @@ class Application:
     def findMidiOutputs(self):
         q = self.patchQueue
         names_list = mido.get_input_names()
+        print(names_list)
 
         # mido.get_input_names() returns duplicates!  so remove them
         names = {}
@@ -271,7 +274,7 @@ class Application:
                     break
         if not instrumentName:
             for n in names:
-                if n.startswith("mio:"):
+                if n.startswith("mio:") or n=="mio":
                     instrumentName = n
                     break
 
@@ -291,7 +294,6 @@ class Application:
 
         self.steps.append( InternalClock(q, 'internal_clock', 100) )
         TimeKeeper(q, 'timekeeper_in', 'clock')
-        self.patch('internal_clock', 'timekeeper_in')
         self.steps.append( self.patchQueue )
         self.patch('clock', 'queue_clock_in')
 
@@ -310,33 +312,40 @@ class Application:
         #
 
         StrumArpeggiator(q, 'arp_in', 'arp_out')
-        StrumPattern(q, 'rhythm_in', 'rhythm_out')
+        StrumPattern(q, 'strumpattern_in', 'strumpattern_out')
         DebugModule(q, 'debug')
         DebugNotes(q, 'debug_notes_in', 'debug_notes_out')
         TransposeModule(q, 'transpose_cc', 'transpose_notes', 'transpose_out')
+        RhythmModule(q, "Rhythm_clock_in", "Rhythm_beat_out", CHACHAR)
     
         # 
         # PATCH!
         #
 
-        #self.patch('clock','debug_notes_in')
-        #self.patch('debug_notes_out','rhythm_in')
+        # USE THIS IF THERE IS NO EXTERNAL MIDI CLOCK
+        # self.patch('internal_clock', 'timekeeper_in')
+        self.patch('keyboard','timekeeper_in')
 
-        #self.patch('clock', 'rhythm_in')
-        #self.patch('keyboard', 'rhythm_in')
-        #self.patch('rhythm_out', 'arp_in')
+        #self.patch('clock','debug_notes_in')
+        #self.patch('debug_notes_out','Rhythm_in')
+
+        #self.patch('clock', 'Rhythm_in')
+        #self.patch('keyboard', 'Rhythm_in')
+        #self.patch('Rhythm_out', 'arp_in')
         #self.patch('arp_out','instrument')
 
         #self.patch('keyboard', 'instrument')
+        self.patch('clock','Rhythm_clock_in')
+        self.patch('Rhythm_beat_out','instrument')
         self.patchChannel('keyboard','instrument',0,0)
 
 
 	# debugging
-        self.patch('keyboard', 'debug')
+        #self.patch('keyboard', 'debug')
         #self.patch('grid', 'debug')
         #self.patch('knobs', 'debug')
-        #self.patch('rhythm_out', 'debug')
-        self.patch('arp_out', 'debug')
+        #self.patch('Rhythm_out', 'debug')
+        #self.patch('arp_out', 'debug')
         #self.patch('clock','debug')
 
         # GO!

@@ -187,4 +187,7 @@ class PatchQueue:
         return
 
     def printPatches(self):
+        for src in self.patches:
+            for dst in self.patches[src]:
+                print("    " + src + " -> " + dst.name)
         return
