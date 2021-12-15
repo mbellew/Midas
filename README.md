@@ -9,16 +9,9 @@ run
 ```$ python3 src/python/Application.py```
 
 
-## USB device names
+## midi device names (python mido library)
 
-### WIN
-
-* mio:...
-* Midi Fighter Twister:...
-* Launchpad...
-* Arturia MicroFreak...
-
-### OSX
+On Linux these names are followed by ":" and then other port information.  Should probably just truncate the names at first ":".
 
 * mio
 * Arturia KeyStep 32
