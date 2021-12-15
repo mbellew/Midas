@@ -224,20 +224,20 @@ class Application:
         if keyboardName:
             # TODO create aliases for sources to avoid needing to create new sinks and patches
             print("opening '" + keyboardName + "' as 'keyboard'")
-            ptm = PassthroughModule(q, "keyboard")
+            ptm = PassthroughModule(q, "keyboard", "passthrogh_keyboard")
             self.patch(keyboardName + "_in", ptm.sink)
 
         # look for fighter twister
 
         twisterDevice = None
         for n in names:
-            if n.startswith("Midi Fighter Twister:"):
+            if n.startswith("Midi Fighter Twister"):
                 twisterDevice = n
         self.patchQueue.createSource("knobs")
         if twisterDevice:
             print("opening '" + twisterDevice + "' as 'knobs'")
-            ptm = PassthroughModule(q, "knobs")
-            self.patch(twisterDevice + "_source", ptm.sink)
+            ptm = PassthroughModule(q, "knobs", "passthrough_knobs")
+            self.patch(twisterDevice + "_in", ptm.sink)
 
         # look for novation lauchpad 
 
@@ -248,7 +248,7 @@ class Application:
         self.patchQueue.createSource("grid")
         if launchpadDevice:
             print("opening '" + launchpadDevice + "' as 'grid'")
-            ptm = PassthroughModule(q, "grid")
+            ptm = PassthroughModule(q, "grid", "passthrough_grid")
             self.patch(launchpadDevice + "_source", ptm.sink)
 
 
@@ -292,7 +292,7 @@ class Application:
         # Wire up the CLOCK and QUEUE
         #
 
-        self.steps.append( InternalClock(q, 'internal_clock', 100) )
+        self.steps.append( InternalClock(q, 'internal_clock', 180) )
         TimeKeeper(q, 'timekeeper_in', 'clock')
         self.steps.append( self.patchQueue )
         self.patch('clock', 'queue_clock_in')
@@ -316,37 +316,27 @@ class Application:
         DebugModule(q, 'debug')
         DebugNotes(q, 'debug_notes_in', 'debug_notes_out')
         TransposeModule(q, 'transpose_cc', 'transpose_notes', 'transpose_out')
-        RhythmModule(q, "Rhythm_clock_in", "Rhythm_beat_out", CHACHAR)
+        RhythmModule(q, "rhythm_clock_in", "rhythm_cc_in", "rhythm_beat_out", PASHTO)
     
         # 
         # PATCH!
         #
 
         # USE THIS IF THERE IS NO EXTERNAL MIDI CLOCK
-        # self.patch('internal_clock', 'timekeeper_in')
-        self.patch('keyboard','timekeeper_in')
+        self.patch('internal_clock', 'timekeeper_in')
+        #self.patch('keyboard','timekeeper_in')
 
-        #self.patch('clock','debug_notes_in')
-        #self.patch('debug_notes_out','Rhythm_in')
-
-        #self.patch('clock', 'Rhythm_in')
-        #self.patch('keyboard', 'Rhythm_in')
-        #self.patch('Rhythm_out', 'arp_in')
-        #self.patch('arp_out','instrument')
-
-        #self.patch('keyboard', 'instrument')
-        self.patch('clock','Rhythm_clock_in')
-        self.patch('Rhythm_beat_out','instrument')
-        self.patchChannel('keyboard','instrument',0,0)
-
+        self.patch('clock','rhythm_clock_in')
+        self.patch('knobs','rhythm_cc_in')
+        self.patch('rhythm_beat_out','instrument')
+        #self.patch('keyboard','instrument')
 
 	# debugging
-        #self.patch('keyboard', 'debug')
         #self.patch('grid', 'debug')
         #self.patch('knobs', 'debug')
         #self.patch('Rhythm_out', 'debug')
         #self.patch('arp_out', 'debug')
-        #self.patch('clock','debug')
+        self.patch('clock','debug')
 
         # GO!
 
