@@ -227,8 +227,8 @@ PRIME232 = Rhythm(12, """
 class Player:
     def __init__(self,rhythm):
         self.rhythm = rhythm
-        self.notes = [60,64,67,72]
-        #self.notes = [1,2,3,4]
+        #self.notes = [60,64,67,72] #chords
+        self.notes = [48,49,51,53]   #garageband
         self.offsets = [0,0,0,0]
         #self.offsets = [0,2,3,5]
         self.probability = [1,1,1,1]
@@ -261,12 +261,13 @@ class MidiMap:
              self.map[msg.control](msg)
 
 class RhythmModule:
-    def __init__(self, q, clock_sink, cc_sink, notes_out, Rhythm):
+    def __init__(self, q, clock_sink, cc_sink, notes_out, Rhythm, channel=1):
         q.createSink(clock_sink,self)
         q.createSink(cc_sink,self)
         self.notes_out = q.createSource(notes_out)
         self.player = Player(Rhythm)
         self.ccmap = MidiMap()
+        self.channel = channel
         self.ccmap.add( 0, lambda m : self.cc_rhythm(m))
         self.ccmap.add( 4, lambda m : self.cc_offset(m,1))
         self.ccmap.add( 9, lambda m : self.cc_offset(m,2))
@@ -295,11 +296,11 @@ class RhythmModule:
             if event.obj.pos != 0:
                 return
             for i in range(0,4):
-                self.notes_out.add(Event(EVENT_MIDI,'debug',mido.Message('note_off',note=self.player.notes[i])))
+                self.notes_out.add(Event(EVENT_MIDI,'debug',mido.Message('note_off',note=self.player.notes[i],channel=self.channel)))
             notes = self.player.next()
             for note in notes:
                 if note:
-                    self.notes_out.add(Event(EVENT_MIDI,'debug',mido.Message('note_on',note=note)))
+                    self.notes_out.add(Event(EVENT_MIDI,'debug',mido.Message('note_on',note=note,channel=self.channel)))
         if event.code == EVENT_MIDI:
             #control_change channel=0 control=0 value=107 time=0
             msg = event.obj

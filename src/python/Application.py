@@ -336,7 +336,7 @@ class Application:
         #self.patch('knobs', 'debug')
         #self.patch('Rhythm_out', 'debug')
         #self.patch('arp_out', 'debug')
-        self.patch('clock','debug')
+        self.patch('rhythm_beat_out','debug')
 
         # GO!
 
