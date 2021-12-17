@@ -1,6 +1,7 @@
 from Event import * 
 import mido
 import random
+from MidiMap import MidiMap
 
 
 Rhythm_array = []
@@ -222,52 +223,54 @@ PRIME232 = Rhythm(12, """
     |xxxxxxxxxxxx     
 """)
 
-
+#KORG Volca Beats MIDI Note to Part
+#36 - C2 - Kick 
+#38 - D2 - Snare
+#43 - G2 - Lo Tom 
+#50 - D3 - Hi Tom 
+#42 - F#2 - Closed Hat 
+#46 - A#2 - Open Hat 
+#39 - D#2 - Clap 
+#75 - D#5 - Claves
+#67 - G4 - Agogo 
+#49 - C#3 - Crash
 
 class Player:
     def __init__(self,rhythm):
         self.rhythm = rhythm
-        #self.notes = [60,64,67,72] #chords
-        self.notes = [48,49,51,53]   #garageband
         self.offsets = [0,0,0,0]
-        #self.offsets = [0,2,3,5]
         self.probability = [1,1,1,1]
-        #self.probability = [1,0.9,0.90,0.70]
         self.time = 0
 
     def next(self):
-        ret = [0, 0, 0, 0]
+        ret = []
         for i in range(0,4):
             t = (self.time + self.offsets[i]) % self.rhythm.count
-            ret[i] = 0 if self.rhythm.parts[i][t]=='.' else self.notes[i]
-            if ret[i] and self.probability[i] < 1 and random.random() > self.probability[i]:
-                ret[i] = 0
+            if self.rhythm.parts[i][t] == '.':
+                continue
+            if self.probability[i] < 1 and random.random() > self.probability[i]:
+                continue
+            ret.append(i)
         self.time = (self.time + 1) % self.rhythm.count
         return ret
 
 
-# Move to own .py
-class MidiMap:
-    def __init__(self):
-        self.map = []
-
-    def add(self, cc, lamb):
-        while len(self.map) <= cc:
-            self.map.append(None)
-        self.map[cc] = lamb
-    
-    def dispatch(self,msg):
-        if msg.control < len(self.map) and self.map[msg.control]:
-             self.map[msg.control](msg)
-
 class RhythmModule:
-    def __init__(self, q, clock_sink, cc_sink, notes_out, Rhythm, channel=1):
+    def __init__(self, q, clock_sink, cc_sink, notes_out, Rhythm, channel=1, ppq=48):
         q.createSink(clock_sink,self)
         q.createSink(cc_sink,self)
+        self.ppq = ppq
         self.notes_out = q.createSource(notes_out)
+
+        self.channel = channel
+        #self.instrument_notes = [60,64,67,72] # C chords
+        #self.instrument_notes = [48,49,51,53]   #garageband
+        self.instrument_notes = [36, 38, 43, 50, 42, 46, 39, 75, 67, 49] # Volca Beats
+        self.instrument = [0,1,4,6]
+        self.notes_currently_on = []
+
         self.player = Player(Rhythm)
         self.ccmap = MidiMap()
-        self.channel = channel
         self.ccmap.add( 0, lambda m : self.cc_rhythm(m))
         self.ccmap.add( 4, lambda m : self.cc_offset(m,1))
         self.ccmap.add( 9, lambda m : self.cc_offset(m,2))
@@ -276,31 +279,45 @@ class RhythmModule:
         self.ccmap.add( 5, lambda m : self.cc_prob(m,1))
         self.ccmap.add( 9, lambda m : self.cc_prob(m,2))
         self.ccmap.add(13, lambda m : self.cc_prob(m,3))
+        self.ccmap.add( 2, lambda m : self.cc_instrument(m,0))
+        self.ccmap.add( 6, lambda m : self.cc_instrument(m,1))
+        self.ccmap.add(10, lambda m : self.cc_instrument(m,2))
+        self.ccmap.add(14, lambda m : self.cc_instrument(m,3))
 
     def cc_rhythm(self, msg):
         r = int((msg.value/128.0) * Rhythm.count())
         self.player.rhythm = Rhythm.get(r)
 
-    def cc_offset(self, msg, c):
+    def cc_offset(self, msg, ch):
         count = self.player.rhythm.count
         offset = int((msg.value/128.0) * count)
-        self.player.offsets[c] = offset
+        self.player.offsets[ch] = offset
 
-    def cc_prob(self, msg, c):
+    def cc_prob(self, msg, ch):
         count = self.player.rhythm.count
         p = msg.value/127.0
-        self.player.probability[c] = p
+        self.player.probability[ch] = p
+
+    def cc_instrument(self, msg, ch):
+        count = len(self.instrument_notes)
+        i = int((msg.value/128.0) * count)
+        self.instrument[ch] = i
 
     def handle(self, event):
         if event.code == EVENT_CLOCK:
-            if event.obj.pos != 0:
+            if event.obj.pulse != 0 and event.obj.pulse != self.ppq/2:
                 return
-            for i in range(0,4):
-                self.notes_out.add(Event(EVENT_MIDI,'debug',mido.Message('note_off',note=self.player.notes[i],channel=self.channel)))
-            notes = self.player.next()
-            for note in notes:
-                if note:
-                    self.notes_out.add(Event(EVENT_MIDI,'debug',mido.Message('note_on',note=note,channel=self.channel)))
+            for on_msg in self.notes_currently_on:
+                off_msg = mido.Message('note_off', note=on_msg.note, channel=on_msg.channel)
+                self.notes_out.add(Event(EVENT_MIDI,'debug',off_msg))
+                self.notes_currently_on = []
+            parts = self.player.next()
+            for part in parts:
+                if part is not None:
+                    note = self.instrument_notes[self.instrument[part]]
+                    on_msg = mido.Message('note_on',note=note,channel=self.channel, velocity=100)
+                    self.notes_currently_on.append(on_msg)
+                    self.notes_out.add(Event(EVENT_MIDI,'debug',on_msg))
         if event.code == EVENT_MIDI:
             #control_change channel=0 control=0 value=107 time=0
             msg = event.obj

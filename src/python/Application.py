@@ -9,6 +9,7 @@ from StrumArpeggiator import StrumArpeggiator
 from StrumPattern import StrumPattern
 from Rhythms import *
 
+PPQ = 12
 
 __unique__ = 100
 
@@ -145,9 +146,20 @@ class PassthroughModule:
 class Application:
 
     def __init__(self):
+        global PPQ
         self.lastPulse = -1
         self.patchQueue = PatchQueue('queue_clock_in')
         self.steps = []
+
+        #
+        # Wire up the CLOCK and QUEUE
+        #
+
+        q = self.patchQueue
+        self.steps.append( InternalClock(q, 'internal_clock', 180, PPQ) )
+        TimeKeeper(q, 'timekeeper_in', 'clock', PPQ)
+        self.steps.append( self.patchQueue )
+        self.patch('clock', 'queue_clock_in')
         return None
 
 
@@ -286,16 +298,8 @@ class Application:
 
 
     def setup(self):
+        global PPQ
         q = self.patchQueue
-
-        #
-        # Wire up the CLOCK and QUEUE
-        #
-
-        self.steps.append( InternalClock(q, 'internal_clock', 180) )
-        TimeKeeper(q, 'timekeeper_in', 'clock')
-        self.steps.append( self.patchQueue )
-        self.patch('clock', 'queue_clock_in')
 
         #
         # MIDI DEVICES
@@ -316,7 +320,7 @@ class Application:
         DebugModule(q, 'debug')
         DebugNotes(q, 'debug_notes_in', 'debug_notes_out')
         TransposeModule(q, 'transpose_cc', 'transpose_notes', 'transpose_out')
-        RhythmModule(q, "rhythm_clock_in", "rhythm_cc_in", "rhythm_beat_out", PASHTO)
+        RhythmModule(q, "rhythm_clock_in", "rhythm_cc_in", "rhythm_beat_out", POP1, channel=9, ppq=PPQ)
     
         # 
         # PATCH!
@@ -327,16 +331,18 @@ class Application:
         #self.patch('keyboard','timekeeper_in')
 
         self.patch('clock','rhythm_clock_in')
+        self.patch('knobs','internal_clock_cc')
         self.patch('knobs','rhythm_cc_in')
         self.patch('rhythm_beat_out','instrument')
-        #self.patch('keyboard','instrument')
+        self.patch('keyboard','instrument')
 
 	# debugging
         #self.patch('grid', 'debug')
         #self.patch('knobs', 'debug')
         #self.patch('Rhythm_out', 'debug')
         #self.patch('arp_out', 'debug')
-        self.patch('rhythm_beat_out','debug')
+        #self.patch('rhythm_beat_out','debug')
+        #self.patch('keyboard','debug')
 
         # GO!
 
