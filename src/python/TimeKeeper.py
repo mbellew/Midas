@@ -30,7 +30,7 @@ class InternalClock:
         qps = bpm/60.0
         pps = self.ppq * qps
         self.pulse_length = 1.0 / pps
-        print("BPM - " + str(self.bpm)
+        print("BPM - " + str(self.bpm))
 
 
     def reset(self):

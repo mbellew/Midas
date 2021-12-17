@@ -15,7 +15,7 @@ class Rhythm:
         str = str.lower()
         arr = str.split("\n")
         for s in arr:
-            s = s.strip().replace("_",".").replace(' ',".")[0:count]
+            s = s.strip().replace("_",".").replace(' ',".")
             if len(s) == 0:
                 continue
             if s.startswith('|'):
