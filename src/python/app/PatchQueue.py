@@ -1,5 +1,5 @@
-from DelayQueue import DelayQueue
-from Event import EVENT_CLOCK
+from app.DelayQueue import DelayQueue
+from app.Event import EVENT_CLOCK
 
 
 SINK_POINT = 100

@@ -1,13 +1,13 @@
 import datetime
 import time
 import mido
-from Event import *
-from PatchQueue import PatchQueue, SINK_POINT, SOURCE_POINT
-from TimeKeeper import TimeKeeper, InternalClock
-from TransposeModule import TransposeModule
-from StrumArpeggiator import StrumArpeggiator
-from StrumPattern import StrumPattern
-from Rhythms import *
+from app.Event import *
+from app.PatchQueue import PatchQueue, SINK_POINT, SOURCE_POINT
+from app.TimeKeeper import TimeKeeper, InternalClock
+from app.TransposeModule import TransposeModule
+from app.StrumArpeggiator import StrumArpeggiator
+from app.StrumPattern import StrumPattern
+from app.Rhythms import *
 
 PPQ = 12
 
@@ -45,13 +45,13 @@ class DebugModule:
         q.createSink(sinkName, self)
 
     def handle(self, event):
-        if EVENT_CLOCK == event.code and event.obj.pulse > 0:
-            return
-        print(datetime.datetime.now(), event)
+        #if EVENT_CLOCK == event.code and event.obj.pulse > 0:
+        #    return
+        print(datetime.datetime.now(), ' ', event.source, ' ', event.obj)
         return EVENT_CONTINUE
 
 
-class DebugNotes:
+class DebugSendNotes:
     def __init__(self, q, sink, source):
         q.createSink(sink, self)
         self.out = q.createSource(source)
@@ -75,9 +75,8 @@ class MidiInputStep:
             for msg in self.port.iter_pending():
                 if msg.type=='aftertouch':
                     continue
-                if msg.type == 'clock':
-                    if self.clock:
-                        self.clock.add(Event(EVENT_MIDI,self.port.name,msg))
+                if self.clock and (msg.type == 'clock' or msg.type == 'stop' or msg.type == 'songpos' or msg.type == 'continue'):
+                    self.clock.add(Event(EVENT_MIDI,self.port.name,msg))
                 else:
                     self.point.add(Event(EVENT_MIDI,self.port.name,msg))
                 new_events = True
@@ -156,10 +155,14 @@ class Application:
         #
 
         q = self.patchQueue
-        self.steps.append( InternalClock(q, 'internal_clock', 180, PPQ) )
-        TimeKeeper(q, 'timekeeper_in', 'clock', PPQ)
+        self.internal_clock = InternalClock(q, 'internal_clock', 180, PPQ)
+        self.steps.append( self.internal_clock )
+        TimeKeeper( self.patchQueue, 'timekeeper_in', 'clock', PPQ)
         self.steps.append( self.patchQueue )
         self.patch('clock', 'queue_clock_in')
+
+        self.findMidiInputs()
+        self.findMidiOutputs()
         return None
 
 
@@ -215,7 +218,7 @@ class Application:
         
         # create a source for every input
         for name in names:
-            step = MidiInputStep(q, name + "_in", mido.open_input(name))
+            step = MidiInputStep(q, name + "_in", mido.open_input(name), name + "_clock")
             self.steps.append(step)
 
         # create "keyboard" source
@@ -236,7 +239,7 @@ class Application:
         if keyboardName:
             # TODO create aliases for sources to avoid needing to create new sinks and patches
             print("opening '" + keyboardName + "' as 'keyboard'")
-            ptm = PassthroughModule(q, "keyboard", "passthrogh_keyboard")
+            ptm = PassthroughModule(q, "keyboard", "passthrough_keyboard")
             self.patch(keyboardName + "_in", ptm.sink)
 
         # look for fighter twister
@@ -281,7 +284,19 @@ class Application:
         instrumentName = None
         if not instrumentName:
             for n in names:
+                if n.startswith("IAC Driver Bus 1"):
+                    instrumentName = n
+                    break
+
+        if not instrumentName:
+            for n in names:
                 if n.startswith("Arturia MicroFreak"):
+                    instrumentName = n
+                    break
+
+        if not instrumentName:
+            for n in names:
+                if n.startswith("Scarlett 4i4 USB"):
                     instrumentName = n
                     break
         if not instrumentName:
@@ -297,58 +312,8 @@ class Application:
             MidiOutModule(q, 'instrument', mido.open_output(instrumentName))
 
 
-    def setup(self):
-        global PPQ
-        q = self.patchQueue
-
-        #
-        # MIDI DEVICES
-        #
-
-        # keyboard, knobs, grid
-        self.findMidiInputs()
-
-        # instrument
-        self.findMidiOutputs()
-
-        #
-        # MODULES
-        #
-
-        StrumArpeggiator(q, 'arp_in', 'arp_out')
-        StrumPattern(q, 'strumpattern_in', 'strumpattern_out')
-        DebugModule(q, 'debug')
-        DebugNotes(q, 'debug_notes_in', 'debug_notes_out')
-        TransposeModule(q, 'transpose_cc', 'transpose_notes', 'transpose_out')
-        RhythmModule(q, "rhythm_clock_in", "rhythm_cc_in", "rhythm_beat_out", POP1, channel=9, ppq=PPQ)
-    
-        # 
-        # PATCH!
-        #
-
-        # USE THIS IF THERE IS NO EXTERNAL MIDI CLOCK
-        self.patch('internal_clock', 'timekeeper_in')
-        #self.patch('keyboard','timekeeper_in')
-
-        self.patch('clock','rhythm_clock_in')
-        self.patch('knobs','internal_clock_cc')
-        self.patch('knobs','rhythm_cc_in')
-        self.patch('rhythm_beat_out','instrument')
-        self.patch('keyboard','instrument')
-
-	# debugging
-        #self.patch('grid', 'debug')
-        #self.patch('knobs', 'debug')
-        #self.patch('Rhythm_out', 'debug')
-        #self.patch('arp_out', 'debug')
-        #self.patch('rhythm_beat_out','debug')
-        #self.patch('keyboard','debug')
-
-        # GO!
-
-        #self.ppqClock.reset()
-
-        return
+    def patch_set(self):
+        raise Exception("YOU NEED TO IMPLEMENT THIS")
 
 
     def print_patch(self):
@@ -375,22 +340,9 @@ class Application:
 
 
     def main(self):
-        self.setup()
         self.print_patch()
         self.patchQueue.optimize()
         while True:
             self.loop()
         return
-
-
-#print("SOURCES")
-#for name in mido.get_input_names():
-#    print("  ", name)
-#print("SINKS")
-#for name in mido.get_output_names():
-#    print("  ", name)
-
-
-application = Application()
-application.main()
 

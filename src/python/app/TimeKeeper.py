@@ -1,7 +1,7 @@
 from datetime import datetime
 import mido
-from Event import Event, EVENT_CLOCK, EVENT_MIDI
-from MidiMap import MidiMap
+from app.Event import Event, EVENT_CLOCK, EVENT_MIDI
+from app.MidiMap import MidiMap
 
 
 class InternalClock:
@@ -80,6 +80,7 @@ class Signature:
         self.pulses_per_measure = self.pulses_per_beat * beats
 
 
+
 class Pulse:
     """can't really extends mido.Message so use our own internal class"""
     def __init__(self, midi, sig):
@@ -102,7 +103,16 @@ class TimeKeeper:
         self.sig = Signature(4,4,ppq)
         q.createSink(sink, self)
         self.out = q.createSource(source)
+        self.current_pulse = 0
 
 
     def handle(self, event):
-        self.out.add(Event(EVENT_CLOCK, event.source+'/timekeeper', Pulse(event.obj,self.sig)))
+        # external clock messages probably don't set time
+        msg = event.obj
+        if msg.type == 'clock':
+            msg.time = self.current_pulse
+            self.out.add(Event(EVENT_CLOCK, event.source+'/timekeeper', Pulse(msg,self.sig)))
+            self.current_pulse = self.current_pulse + 1
+
+        elif msg.type == 'stop':
+            self.current_pulse = 0

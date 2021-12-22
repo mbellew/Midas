@@ -1,5 +1,5 @@
 from typing import SupportsRound
-from Event import Event, EVENT_MIDI, EVENT_CONTINUE, EVENT_DONE
+from app.Event import Event, EVENT_MIDI, EVENT_CONTINUE, EVENT_DONE
 
 
 class TransposeModule:

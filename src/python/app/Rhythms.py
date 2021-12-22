@@ -1,7 +1,7 @@
-from Event import * 
+from app.Event import * 
 import mido
 import random
-from MidiMap import MidiMap
+from app.MidiMap import MidiMap
 
 
 Rhythm_array = []
@@ -223,17 +223,6 @@ PRIME232 = Rhythm(12, """
     |xxxxxxxxxxxx     
 """)
 
-#KORG Volca Beats MIDI Note to Part
-#36 - C2 - Kick 
-#38 - D2 - Snare
-#43 - G2 - Lo Tom 
-#50 - D3 - Hi Tom 
-#42 - F#2 - Closed Hat 
-#46 - A#2 - Open Hat 
-#39 - D#2 - Clap 
-#75 - D#5 - Claves
-#67 - G4 - Agogo 
-#49 - C#3 - Crash
 
 class Player:
     def __init__(self,rhythm):
@@ -255,21 +244,63 @@ class Player:
         return ret
 
 
+
+# This is really just a note remapping helper that deals with Drum kits, since they all have different mappings
+# onto notes (or sometimes CC)
+class DrumKit:
+    def __init__(self, instruments):
+        self.instruments = instruments
+
+    # return a midi message
+    def note_on(self, i):
+        inst = self.instruments[i % len(self.instruments)]
+        return inst['on']
+
+    # return a midi message
+    def note_off(self, i):
+        inst = self.instruments[i % len(self.instruments)]
+        return inst['off']
+
+    def count(self) -> int:
+        return len(self.instruments)
+
+class NotesDrumKit(DrumKit):
+    def __init__(self, notes):
+        instruments = []
+        for i in range(0,len(notes)):
+            inst = {'on':mido.Message('note_on',note=notes[i]), 'off':mido.Message('note_off',note=notes[i]) }
+            instruments.append(inst)
+        super().__init__(instruments)
+
+class VolcaBeats(NotesDrumKit):
+    def __init__(self):
+        super().__init__([36, 38, 43, 50, 42, 46, 39, 75, 67, 49])
+
+class MpcDrumTrack(NotesDrumKit):
+    def __init__(self):
+        # C2 Major
+        super().__init__([36,38,40,41,43,45,47, 48,50,52,53,55,57,59])
+
+class Spark(NotesDrumKit):
+    def __init__(self):
+        # C2 Chromatic
+        super().__init__([48,49,50,51,52,53,54,55,56,67,58,59, 60,61,62,63])
+
+
+
 class RhythmModule:
-    def __init__(self, q, clock_sink, cc_sink, notes_out, Rhythm, channel=1, ppq=48):
+    def __init__(self, q, clock_sink, cc_sink, notes_out, rhythm=POP1, drumkit=None, channel=1, ppq=48):
         q.createSink(clock_sink,self)
         q.createSink(cc_sink,self)
         self.ppq = ppq
         self.notes_out = q.createSource(notes_out)
 
         self.channel = channel
-        #self.instrument_notes = [60,64,67,72] # C chords
-        #self.instrument_notes = [48,49,51,53]   #garageband
-        self.instrument_notes = [36, 38, 43, 50, 42, 46, 39, 75, 67, 49] # Volca Beats
-        self.instrument = [0,1,4,6]
+        self.drumkit = drumkit if drumkit else Spark()
+        self.instrument = [0,1,2,3]
         self.notes_currently_on = []
 
-        self.player = Player(Rhythm)
+        self.player = Player(rhythm)
         self.ccmap = MidiMap()
         self.ccmap.add( 0, lambda m : self.cc_rhythm(m))
         self.ccmap.add( 4, lambda m : self.cc_offset(m,1))
@@ -294,7 +325,6 @@ class RhythmModule:
         self.player.offsets[ch] = offset
 
     def cc_prob(self, msg, ch):
-        count = self.player.rhythm.count
         p = msg.value/127.0
         self.player.probability[ch] = p
 
@@ -307,33 +337,17 @@ class RhythmModule:
         if event.code == EVENT_CLOCK:
             if event.obj.pulse != 0 and event.obj.pulse != self.ppq/2:
                 return
-            for on_msg in self.notes_currently_on:
-                off_msg = mido.Message('note_off', note=on_msg.note, channel=on_msg.channel)
+            for off_msg in self.notes_currently_on:
                 self.notes_out.add(Event(EVENT_MIDI,'debug',off_msg))
                 self.notes_currently_on = []
             parts = self.player.next()
             for part in parts:
                 if part is not None:
-                    note = self.instrument_notes[self.instrument[part]]
-                    on_msg = mido.Message('note_on',note=note,channel=self.channel, velocity=100)
-                    self.notes_currently_on.append(on_msg)
+                    on_msg = self.drumkit.note_on(self.instrument[part])
+                    off_msg = self.drumkit.note_off(self.instrument[part])
+                    self.notes_currently_on.append(off_msg)
                     self.notes_out.add(Event(EVENT_MIDI,'debug',on_msg))
         if event.code == EVENT_MIDI:
-            #control_change channel=0 control=0 value=107 time=0
             msg = event.obj
             if msg.type == 'control_change':
                 self.ccmap.dispatch(msg)
-
-                # if msg.control == 0:
-                #     r = int((msg.value/128.0) * Rhythm.count())
-                #     self.player.rhythm = Rhythm.get(r)
-                # if msg.control == 4 or msg.control == 8 or msg.control == 12:
-                #     i = int((msg.control-0)/4)
-                #     count = self.player.rhythm.count
-                #     offset = int((msg.value/128.0) * count)
-                #     self.player.offsets[i] = offset
-                # if msg.control == 1 or msg.control == 5 or msg.control == 9 or msg.control == 13:
-                #     i = int((msg.control-1)/4)
-                #     count = self.player.rhythm.count
-                #     p = msg.value/127.0
-                #     self.player.probability[i] = p
