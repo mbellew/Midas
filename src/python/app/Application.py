@@ -9,7 +9,7 @@ from app.StrumArpeggiator import StrumArpeggiator
 from app.StrumPattern import StrumPattern
 from app.Rhythms import *
 
-PPQ = 12
+PPQ = 24
 
 __unique__ = 100
 

@@ -286,10 +286,8 @@ class Spark(NotesDrumKit):
         # C2 Chromatic
         super().__init__([60,61,62,63,64,65,66,67,68,69,70,71, 72,73,74,75])
 
-
-
 class RhythmModule:
-    def __init__(self, q, clock_sink, cc_sink, notes_out, rhythm=POP1, drumkit=None, channel=1, ppq=48):
+    def __init__(self, q, clock_sink, cc_sink, notes_out, rhythm=POP1, drumkit=None, channel=10, ppq=48):
         q.createSink(clock_sink,self)
         q.createSink(cc_sink,self)
         self.ppq = ppq
@@ -329,7 +327,7 @@ class RhythmModule:
         self.player.probability[ch] = p
 
     def cc_instrument(self, msg, ch):
-        count = len(self.instrument_notes)
+        count = self.drumkit.count()
         i = int((msg.value/128.0) * count)
         self.instrument[ch] = i
 
@@ -344,9 +342,11 @@ class RhythmModule:
             for part in parts:
                 if part is not None:
                     on_msg = self.drumkit.note_on(self.instrument[part])
+                    on_msg.channel = self.channel
                     off_msg = self.drumkit.note_off(self.instrument[part])
+                    off_msg.channel = self.channel
                     self.notes_currently_on.append(off_msg)
-                    self.notes_out.add(Event(EVENT_MIDI,'debug',on_msg))
+                    self.notes_out.add(Event(EVENT_MIDI,'rhythms',on_msg))
         if event.code == EVENT_MIDI:
             msg = event.obj
             if msg.type == 'control_change':
