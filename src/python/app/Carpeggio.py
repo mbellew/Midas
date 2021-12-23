@@ -1,7 +1,40 @@
 import mido
 from random import random, randrange
 from app.MidiMap import MidiMap
-from app.Event import Event, EVENT_CLOCK, EVENT_MIDI
+from app.Event import Event, EVENT_CLOCK, EVENT_MIDI, EVENT_STOP
+
+
+
+#TODO This is the start of a new abstract base class
+
+class AbstractModule:
+    def __init__(self):
+        self.ccmap = MidiMap()
+
+    def handle(self, event):
+        if event.code == EVENT_CLOCK:
+            self.handle_clock(event.obj)
+
+        if event.code == EVENT_STOP:
+            self.handle_stop()
+
+        if event.code == EVENT_MIDI:
+            msg = event.obj
+            if msg.type == 'control_change':
+                self.ccmap.dispatch(msg)
+
+            if msg.type == 'note_on' or msg.type == 'note_off':
+                self.handle_note(msg)
+
+    def handle_clock(pulse):
+        return
+
+    def handle_stop():
+        return
+
+    def handle_note(msg):
+        return
+
 
 # adapted from https://github.com/Chysn/O_C-HemisphereSuite/wiki/Carpeggio-Cartesian-Arpeggiator
 
@@ -130,10 +163,12 @@ MINOR_KEY_CHORDS = [
 ]
 
 
-class Carpeggio:
+class Carpeggio(AbstractModule):
     def __init__(self, q, clock_sink, cc_sink, notes_out, channel=9, drone=None, ppq=48):
+        super().__init__()
+        self.time = -1
         self.root = 36
-        self.drone = drone
+        self.drone_channel = drone
         self.note_prob = 0.92
 
         # step sequencer and chord sequencer functions
@@ -152,51 +187,52 @@ class Carpeggio:
         self.drone_notes = []
         self.ccmap = MidiMap()
 
-    def handle(self, event):
-        if event.code == EVENT_CLOCK:
-            pulse = event.obj
-            if pulse.pulse != 0:
-                return
+    def handle_clock(self, pulse):
+        self.time = pulse.time
+        if pulse.pulse != 0:
+            return
 
-            # drone
-            if self.drone is not None and pulse.beat == 0:
-                if pulse.measure%4 == 0:
-                    for off_msg in self.drone_notes:
-                        self.notes_out.add(Event(EVENT_MIDI,'carpeggio.drone',off_msg))
-                    self.drone_notes = []
-                    self.current_sequence = self.next_chord_fn(pulse.measure)
-                    note = self.root + self.current_sequence[0]
-                    on_msg = mido.Message('note_on', note=note, channel=self.drone)
-                    off_msg = mido.Message('note_off', note=note, channel=self.drone)
-                    self.drone_notes.append(off_msg)
-                    self.notes_out.add(Event(EVENT_MIDI,'carpeggio.drone',on_msg))
-                elif pulse.measure%4 == 2:
-                    note = self.current_sequence[0]
-                    on_msg = mido.Message('note_on', note=note, channel=self.drone)
-                    self.notes_out.add(Event(EVENT_MIDI,'carpeggio.drone',on_msg))
+        # drone
+        if self.drone_channel is not None and pulse.beat == 0:
+            if pulse.measure%4 == 0:
+                self.current_sequence = self.next_chord_fn(pulse.measure)
+            if pulse.measure%1 == 0:
+                for off_msg in self.drone_notes:
+                    off_msg.time = self.time
+                    self.notes_out.add(Event(EVENT_MIDI,'carpeggio.drone',off_msg))
+                self.drone_notes = []
+                note = self.root + self.current_sequence[0]
+                on_msg = mido.Message('note_on', note=note, channel=self.drone_channel, time=self.time)
+                off_msg = mido.Message('note_off', note=note, channel=self.drone_channel)
+                self.drone_notes.append(off_msg)
+                self.notes_out.add(Event(EVENT_MIDI,'carpeggio.drone',on_msg))
 
-            # bass motif
-            for off_msg in self.notes_currently_on:
-                self.notes_out.add(Event(EVENT_MIDI,'carpeggio',off_msg))
-            self.notes_currently_on = []
-            self.step = self.next_step_fn(self.step)
-            start_of_sequence = ((pulse.measure%4)==0) and (pulse.beat == 0)
-            note = self.root + self.current_sequence[self.step % 16]
-            on_msg = mido.Message('note_on', note=note, channel=self.channel)
-            if start_of_sequence:
-                on_msg.note = self.root + self.current_sequence[0]
-                on_msg.velocity = min(127,int(on_msg.velocity*1.5))
-            elif random() > self.note_prob:
-                on_msg.velocity = 0
-            elif pulse.beat == 0:
-                on_msg.velocity = min(127,int(on_msg.velocity*1.25))
-            off_msg = mido.Message('note_off', note=note, channel=self.channel)
-            self.notes_currently_on.append(off_msg)
-            self.notes_out.add(Event(EVENT_MIDI,'carpeggio',on_msg))
-        if event.code == EVENT_MIDI:
-            msg = event.obj
-            if msg.type == 'control_change':
-                self.ccmap.dispatch(msg)
+        # bass motif
+        for off_msg in self.notes_currently_on:
+            off_msg.time = self.time
+            self.notes_out.add(Event(EVENT_MIDI,'carpeggio',off_msg))
+        self.notes_currently_on = []
+        self.step = self.next_step_fn(self.step)
+        start_of_sequence = ((pulse.measure%4)==0) and (pulse.beat == 0)
+        note = self.root + self.current_sequence[self.step % 16]
+        on_msg = mido.Message('note_on', note=note, channel=self.channel, time=self.time)
+        if start_of_sequence:
+            on_msg.note = self.root + self.current_sequence[0]
+            on_msg.velocity = min(127,int(on_msg.velocity*1.5))
+        elif random() > self.note_prob:
+            on_msg.velocity = 0
+        elif pulse.beat == 0:
+            on_msg.velocity = min(127,int(on_msg.velocity*1.25))
+        off_msg = mido.Message('note_off', note=note, channel=self.channel)
+        self.notes_currently_on.append(off_msg)
+        self.notes_out.add(Event(EVENT_MIDI,'carpeggio',on_msg))
+
+
+    def handle_stop(self):
+        for off_msg in self.notes_currently_on:
+            self.notes_out.add(Event(EVENT_MIDI,'carpeggio',off_msg))
+        for off_msg in self.drone_notes:
+            self.notes_out.add(Event(EVENT_MIDI,'carpeggio.drone',off_msg))
 
 
 class CarpeggioRand(Carpeggio):

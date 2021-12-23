@@ -12,6 +12,7 @@ EVENT_CONTINUE = 1
 
 
 EVENT_CLOCK=allocate_event()        # ppq
+EVENT_STOP=allocate_event()
 EVENT_MIDI=allocate_event()
 EVENT_KEYCHANGE=allocate_event()
 

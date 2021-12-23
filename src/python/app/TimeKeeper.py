@@ -1,6 +1,6 @@
 from datetime import datetime
 import mido
-from app.Event import Event, EVENT_CLOCK, EVENT_MIDI
+from app.Event import Event, EVENT_CLOCK, EVENT_MIDI, EVENT_STOP
 from app.MidiMap import MidiMap
 
 
@@ -116,3 +116,4 @@ class TimeKeeper:
 
         elif msg.type == 'stop':
             self.current_pulse = 0
+            self.out.add(Event(EVENT_STOP, event.source+'/timekeeper', None))
