@@ -129,11 +129,12 @@ MINOR_KEY_CHORDS = [
             generate_sequence("dim triad",11)  #B   viio Diminished triad
 ]
 
+
 class Carpeggio:
     def __init__(self, q, clock_sink, cc_sink, notes_out, channel=9, drone=None, ppq=48):
         self.root = 36
         self.drone = drone
-        self.note_prob = 0.95
+        self.note_prob = 0.92
 
         # step sequencer and chord sequencer functions
         self.next_step_fn = lambda step : (step + 1) % 16
@@ -179,12 +180,19 @@ class Carpeggio:
                 self.notes_out.add(Event(EVENT_MIDI,'carpeggio',off_msg))
             self.notes_currently_on = []
             self.step = self.next_step_fn(self.step)
-            if random() < self.note_prob:
-                note = self.root + self.current_sequence[self.step % 16]
-                on_msg = mido.Message('note_on', note=note, channel=self.channel)
-                off_msg = mido.Message('note_off', note=note, channel=self.channel)
-                self.notes_currently_on.append(off_msg)
-                self.notes_out.add(Event(EVENT_MIDI,'carpeggio',on_msg))
+            start_of_sequence = ((pulse.measure%4)==0) and (pulse.beat == 0)
+            note = self.root + self.current_sequence[self.step % 16]
+            on_msg = mido.Message('note_on', note=note, channel=self.channel)
+            if start_of_sequence:
+                on_msg.note = self.root + self.current_sequence[0]
+                on_msg.velocity = min(127,int(on_msg.velocity*1.5))
+            elif random() > self.note_prob:
+                on_msg.velocity = 0
+            elif pulse.beat == 0:
+                on_msg.velocity = min(127,int(on_msg.velocity*1.25))
+            off_msg = mido.Message('note_off', note=note, channel=self.channel)
+            self.notes_currently_on.append(off_msg)
+            self.notes_out.add(Event(EVENT_MIDI,'carpeggio',on_msg))
         if event.code == EVENT_MIDI:
             msg = event.obj
             if msg.type == 'control_change':
@@ -205,10 +213,10 @@ class CarpeggioGenerative(Carpeggio):
         self.state = int(random() * 210343859341) & 0xffff
         self.last_chord = -1
         self.next_step_fn  = lambda step : self.next_step()
-        self.next_chord_fn = lambda measure : self.next_chord()
+        self.next_chord_fn = lambda measure : self.next_chord(measure)
 
     def next_step(self):
-        print(hex(self.state))
+        #print(hex(self.state))
         curr = self.state & 0x000f
         s = (self.state << 5) | ((self.state >> 11) & 0x001f)
         if random() < self.seq_prob:
@@ -216,26 +224,29 @@ class CarpeggioGenerative(Carpeggio):
         self.state = s & 0x0000ffff
         return curr
 
-    def next_chord(self):
+    def next_chord(self, measure):
         r = random()
-        if r < 0.2:
-            c = 0
+        if measure==0:
+            c=0
+        elif r < 0.2:
+            c = 0       # I
         elif r < 0.4:
-            c = 1
+            c = 4       # V
         elif r < 0.6:
-            c = 2
+            c = 3       # IV
         elif r < 0.7:
-            c = 3
+            c = 1       #II
         elif r < 0.8:
-            c = 4
+            c = 2       #III
         elif r < 0.9:
-            c = 5
+            c = 5       #VI
         else:
-            c = 6
+            c = 6       #VII
         if c != self.last_chord:
             self.last_chord = c
         else:
             self.last_chord = randrange(0,7)
+        print("CHORD " + str(c+1))
         if self.minor:
             return MINOR_KEY_CHORDS[self.last_chord]
         else:
