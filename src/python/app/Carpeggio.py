@@ -12,6 +12,15 @@ class ArpChord:
         self.nr_notes = nr_notes
         self.octave_span = octave_span
 
+    def generate_sequence(self, root):
+        sequence = [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]
+        for s in range(0,16):
+            oct = (s / self.nr_notes) % 3
+            tone = s % self.nr_notes
+            sequence[s] = int(self.chord_tones[tone] + (12 * oct) + root)
+        return sequence
+
+
 arp_chords = [
   #ARPEGGIATE
   ArpChord("Maj triad",[0, 4, 7], 3,1),
@@ -81,8 +90,7 @@ arp_chords = [
   ArpChord("All 5th",[0,7,14,21,28,35,41],7,4)
 ]
 
-# returns int[16] of midi notes (int)
-def generate_sequence(chord_desc,transpose=0):
+def find_chord(chord_desc):
     chord = None
     if type(chord_desc) == type(""):
         for c in arp_chords:
@@ -93,36 +101,46 @@ def generate_sequence(chord_desc,transpose=0):
         chord = arp_chords[chord_desc % len(arp_chords)]
     if chord is None:
         raise("chord not found: " + chord_desc)
+    return chord
 
-    sequence = [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]
-    for s in range(0,16):
-        oct = (s / chord.nr_notes) % 4
-        tone = s % chord.nr_notes
-        sequence[s] = int(chord.chord_tones[tone] + 36 + (12 * oct) + transpose)
-    return sequence
 
+# returns int[16] of midi notes
+def generate_sequence(chord_desc,root=36):
+    chord = find_chord(chord_desc)
+    return chord.generate_sequence(root)
+
+
+MAJOR_KEY_CHORDS = [
+            generate_sequence("Maj triad",0),  #C   I
+            generate_sequence("min triad",2),  #D   ii
+            generate_sequence("min triad",4),  #E   iii
+            generate_sequence("Maj triad",5),  #F   IV
+            generate_sequence("Maj triad",7),  #G   V
+            generate_sequence("min triad",9),  #A   vi
+            generate_sequence("dim triad",11)  #B   viio Diminished triad
+]
+MINOR_KEY_CHORDS = [
+            generate_sequence("min triad",0),  #C   i
+            generate_sequence("dim triad",2),  #D   iio Diminished triad
+            generate_sequence("aug triad",4),  #E   III+ Augmented triad
+            generate_sequence("min triad",5),  #F   iv
+            generate_sequence("Maj triad",7),  #G   V
+            generate_sequence("Maj triad",9),  #A   VI
+            generate_sequence("dim triad",11)  #B   viio Diminished triad
+]
 
 class Carpeggio:
     def __init__(self, q, clock_sink, cc_sink, notes_out, channel=9, drone=None, ppq=48):
-        self.key = 0
+        self.root = 36
         self.drone = drone
         self.note_prob = 0.95
-        self.sequences = [
-            generate_sequence("Maj triad",0), #C
-            generate_sequence("min triad",2), #D
-            generate_sequence("min triad",4), #E
-            generate_sequence("Maj triad",5), #F
-            generate_sequence("Maj triad",7), #G
-            generate_sequence("min triad",9), #A
-            generate_sequence("Maj triad",11)  #B
-        ]
-        self.current_sequence = self.sequences[0]
-        self.next_sequence = None
-        self.step = -1
 
         # step sequencer and chord sequencer functions
         self.next_step_fn = lambda step : (step + 1) % 16
-        self.next_chord_fn = lambda measure : randrange(len(self.sequences))
+        self.next_chord_fn = lambda measure : MAJOR_KEY_CHORDS[randrange(len(MAJOR_KEY_CHORDS))]
+
+        self.current_sequence = self.next_chord_fn(0)
+        self.step = -1
 
         q.createSink(clock_sink,self)
         q.createSink(cc_sink,self)
@@ -132,7 +150,6 @@ class Carpeggio:
         self.notes_currently_on = []
         self.drone_notes = []
         self.ccmap = MidiMap()
-
 
     def handle(self, event):
         if event.code == EVENT_CLOCK:
@@ -146,8 +163,8 @@ class Carpeggio:
                     for off_msg in self.drone_notes:
                         self.notes_out.add(Event(EVENT_MIDI,'carpeggio.drone',off_msg))
                     self.drone_notes = []
-                    self.current_sequence = self.sequences[self.next_chord_fn(pulse.measure)]
-                    note = self.current_sequence[0]
+                    self.current_sequence = self.next_chord_fn(pulse.measure)
+                    note = self.root + self.current_sequence[0]
                     on_msg = mido.Message('note_on', note=note, channel=self.drone)
                     off_msg = mido.Message('note_off', note=note, channel=self.drone)
                     self.drone_notes.append(off_msg)
@@ -163,7 +180,7 @@ class Carpeggio:
             self.notes_currently_on = []
             self.step = self.next_step_fn(self.step)
             if random() < self.note_prob:
-                note = self.current_sequence[self.step % 16]
+                note = self.root + self.current_sequence[self.step % 16]
                 on_msg = mido.Message('note_on', note=note, channel=self.channel)
                 off_msg = mido.Message('note_off', note=note, channel=self.channel)
                 self.notes_currently_on.append(off_msg)
@@ -174,7 +191,6 @@ class Carpeggio:
                 self.ccmap.dispatch(msg)
 
 
-
 class CarpeggioRand(Carpeggio):
     def __init__(self, q, clock_sink, cc_sink, notes_out, channel=9, ppq=48):
         super().__init__(q, clock_sink, cc_sink, notes_out, channel, ppq)
@@ -182,12 +198,14 @@ class CarpeggioRand(Carpeggio):
 
 
 class CarpeggioGenerative(Carpeggio):
-    def __init__(self, q, clock_sink, cc_sink, notes_out, drone=None, channel=9, ppq=48):
+    def __init__(self, q, clock_sink, cc_sink, notes_out, drone=None, channel=9, ppq=48, minor=False):
         super().__init__(q, clock_sink, cc_sink, notes_out, drone=drone, channel=channel, ppq=ppq)
+        self.minor = minor
         self.seq_prob = 0.05
         self.state = int(random() * 210343859341) & 0xffff
+        self.last_chord = -1
         self.next_step_fn  = lambda step : self.next_step()
-        self.next_chord_fn = lambda measure : self.next_step()
+        self.next_chord_fn = lambda measure : self.next_chord()
 
     def next_step(self):
         print(hex(self.state))
@@ -198,19 +216,27 @@ class CarpeggioGenerative(Carpeggio):
         self.state = s & 0x0000ffff
         return curr
 
-    def next_step(self):
+    def next_chord(self):
         r = random()
         if r < 0.2:
-            return 0
-        if r < 0.4:
-            return 1
-        if r < 0.6:
-            return 2
-        if r < 0.7:
-            return 3
-        if r < 0.8:
-            return 4
-        if r < 0.9:
-            return 5
-        return 6
-
+            c = 0
+        elif r < 0.4:
+            c = 1
+        elif r < 0.6:
+            c = 2
+        elif r < 0.7:
+            c = 3
+        elif r < 0.8:
+            c = 4
+        elif r < 0.9:
+            c = 5
+        else:
+            c = 6
+        if c != self.last_chord:
+            self.last_chord = c
+        else:
+            self.last_chord = randrange(0,7)
+        if self.minor:
+            return MINOR_KEY_CHORDS[self.last_chord]
+        else:
+            return MAJOR_KEY_CHORDS[self.last_chord]
