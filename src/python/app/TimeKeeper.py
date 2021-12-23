@@ -86,9 +86,9 @@ class Pulse:
     def __init__(self, midi, sig):
         global MIDI_CLOCK_MESSAGE
         self.time  = midi.time                                                  # current pulse since 'start' (zero based)
-        self.beat  = (int)((self.time % sig.pulses_per_measure) / sig.pulses_per_beat)                       # zero-based "0 and 1 and 2 and 3 and"
-        self.measure = (int)(self.time / sig.pulses_per_measure)                     # count of measures since 'start'
-        self.pulse   = self.time % sig.pulses_per_beat                          # pulse count in current beat 0-23 
+        self.beat  = int((self.time % sig.pulses_per_measure) / sig.pulses_per_beat)                       # zero-based "0 and 1 and 2 and 3 and"
+        self.measure = int(self.time / sig.pulses_per_measure)                     # count of measures since 'start'
+        self.pulse   = int(self.time % sig.pulses_per_beat)                          # pulse count in current beat 0-23 
         self.pos     = (self.time % sig.pulses_per_beat) / sig.pulses_per_beat     # progress in current beat 0-1.0 (e.g 1/8 note is 0.5)
  
     def __str__(self):

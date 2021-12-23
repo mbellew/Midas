@@ -1,5 +1,5 @@
 import mido
-from random import random
+from random import random, randrange
 from app.MidiMap import MidiMap
 from app.Event import Event, EVENT_CLOCK, EVENT_MIDI
 
@@ -82,8 +82,18 @@ arp_chords = [
 ]
 
 # returns int[16] of midi notes (int)
-def generate_sequence(chord_no,transpose=0):
-    chord = arp_chords[chord_no % len(arp_chords)]
+def generate_sequence(chord_desc,transpose=0):
+    chord = None
+    if type(chord_desc) == type(""):
+        for c in arp_chords:
+            if c.chord_name == chord_desc:
+                chord = c
+                break
+    else:
+        chord = arp_chords[chord_desc % len(arp_chords)]
+    if chord is None:
+        raise("chord not found: " + chord_desc)
+
     sequence = [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]
     for s in range(0,16):
         oct = (s / chord.nr_notes) % 4
@@ -93,10 +103,26 @@ def generate_sequence(chord_no,transpose=0):
 
 
 class Carpeggio:
-    def __init__(self, q, clock_sink, cc_sink, notes_out, channel=9, ppq=48):
-        self.sequence = generate_sequence(0,-12)
+    def __init__(self, q, clock_sink, cc_sink, notes_out, channel=9, drone=None, ppq=48):
+        self.key = 0
+        self.drone = drone
+        self.note_prob = 0.95
+        self.sequences = [
+            generate_sequence("Maj triad",0), #C
+            generate_sequence("min triad",2), #D
+            generate_sequence("min triad",4), #E
+            generate_sequence("Maj triad",5), #F
+            generate_sequence("Maj triad",7), #G
+            generate_sequence("min triad",9), #A
+            generate_sequence("Maj triad",11)  #B
+        ]
+        self.current_sequence = self.sequences[0]
+        self.next_sequence = None
         self.step = -1
+
+        # step sequencer and chord sequencer functions
         self.next_step_fn = lambda step : (step + 1) % 16
+        self.next_chord_fn = lambda measure : randrange(len(self.sequences))
 
         q.createSink(clock_sink,self)
         q.createSink(cc_sink,self)
@@ -104,22 +130,44 @@ class Carpeggio:
         self.notes_out = q.createSource(notes_out)
         self.channel = channel
         self.notes_currently_on = []
+        self.drone_notes = []
         self.ccmap = MidiMap()
 
 
     def handle(self, event):
         if event.code == EVENT_CLOCK:
-            if event.obj.pulse != 0:
+            pulse = event.obj
+            if pulse.pulse != 0:
                 return
+
+            # drone
+            if self.drone is not None and pulse.beat == 0:
+                if pulse.measure%4 == 0:
+                    for off_msg in self.drone_notes:
+                        self.notes_out.add(Event(EVENT_MIDI,'carpeggio.drone',off_msg))
+                    self.drone_notes = []
+                    self.current_sequence = self.sequences[self.next_chord_fn(pulse.measure)]
+                    note = self.current_sequence[0]
+                    on_msg = mido.Message('note_on', note=note, channel=self.drone)
+                    off_msg = mido.Message('note_off', note=note, channel=self.drone)
+                    self.drone_notes.append(off_msg)
+                    self.notes_out.add(Event(EVENT_MIDI,'carpeggio.drone',on_msg))
+                elif pulse.measure%4 == 2:
+                    note = self.current_sequence[0]
+                    on_msg = mido.Message('note_on', note=note, channel=self.drone)
+                    self.notes_out.add(Event(EVENT_MIDI,'carpeggio.drone',on_msg))
+
+            # bass motif
             for off_msg in self.notes_currently_on:
                 self.notes_out.add(Event(EVENT_MIDI,'carpeggio',off_msg))
-                self.notes_currently_on = []
+            self.notes_currently_on = []
             self.step = self.next_step_fn(self.step)
-            note = self.sequence[self.step % 16]
-            on_msg = mido.Message('note_on', note=note, channel=self.channel)
-            off_msg = mido.Message('note_off', note=note, channel=self.channel)
-            self.notes_currently_on.append(off_msg)
-            self.notes_out.add(Event(EVENT_MIDI,'carpeggio',on_msg))
+            if random() < self.note_prob:
+                note = self.current_sequence[self.step % 16]
+                on_msg = mido.Message('note_on', note=note, channel=self.channel)
+                off_msg = mido.Message('note_off', note=note, channel=self.channel)
+                self.notes_currently_on.append(off_msg)
+                self.notes_out.add(Event(EVENT_MIDI,'carpeggio',on_msg))
         if event.code == EVENT_MIDI:
             msg = event.obj
             if msg.type == 'control_change':
@@ -134,17 +182,35 @@ class CarpeggioRand(Carpeggio):
 
 
 class CarpeggioGenerative(Carpeggio):
-    def __init__(self, q, clock_sink, cc_sink, notes_out, channel=9, ppq=48):
-        super().__init__(q, clock_sink, cc_sink, notes_out, channel, ppq)
-        self.prob = 0.1
+    def __init__(self, q, clock_sink, cc_sink, notes_out, drone=None, channel=9, ppq=48):
+        super().__init__(q, clock_sink, cc_sink, notes_out, drone=drone, channel=channel, ppq=ppq)
+        self.seq_prob = 0.05
         self.state = int(random() * 210343859341) & 0xffff
-        self.next_step_fn = lambda step : self.next_step()
+        self.next_step_fn  = lambda step : self.next_step()
+        self.next_chord_fn = lambda measure : self.next_step()
 
     def next_step(self):
         print(hex(self.state))
         curr = self.state & 0x000f
-        s = (self.state << 3) | ((self.state >> 5) & 0x0007)
-        if random() < self.prob:
+        s = (self.state << 5) | ((self.state >> 11) & 0x001f)
+        if random() < self.seq_prob:
             s = s ^ 0x0001
         self.state = s & 0x0000ffff
         return curr
+
+    def next_step(self):
+        r = random()
+        if r < 0.2:
+            return 0
+        if r < 0.4:
+            return 1
+        if r < 0.6:
+            return 2
+        if r < 0.7:
+            return 3
+        if r < 0.8:
+            return 4
+        if r < 0.9:
+            return 5
+        return 6
+

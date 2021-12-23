@@ -12,8 +12,9 @@ q = app.patchQueue
 
 StrumPattern(q, 'strumpattern_in', 'strumpattern_out')
 DebugModule(q, 'debug')
-RhythmModule(q, "rhythm_clock_in", "rhythm_cc_in", "rhythm_out", drumkit=MpcDrumTrack(), channel=9, ppq=PPQ)
-CarpeggioGenerative(q, "carpeggio_clock_in", "carpeggio_cc_in", "carpeggio_out", channel=8, ppq=PPQ)
+#RhythmModule(q, "rhythm_clock_in", "rhythm_cc_in", "rhythm_out", drumkit=MpcDrumTrack(), channel=9, ppq=PPQ)
+RhythmModule(q, "rhythm_clock_in", "rhythm_cc_in", "rhythm_out", drumkit=Spark(), channel=9, ppq=PPQ)
+CarpeggioGenerative(q, "carpeggio_clock_in", "carpeggio_cc_in", "carpeggio_out", channel=8, drone=7, ppq=PPQ)
 
 # 
 # PATCH!
@@ -31,16 +32,14 @@ app.patch('clock','rhythm_clock_in')
 app.patch('knobs','rhythm_cc_in')
 # send to MPC
 app.patch('rhythm_out','instrument')
+#app.patch('rhythm_out','debug')
 
 # sequencer needs clock, and supports control_change messages
 app.patch('clock','carpeggio_clock_in')
-app.patch('knobs','carpeggio_cc_in')
+#app.patch('knobs','carpeggio_cc_in')
 # send to MPC
 app.patch('carpeggio_out','instrument')
-
-
-# debug output
-app.patch('carpeggio_out','debug')
+#app.patch('carpeggio_out','debug')
 
 # pass through keyboard to instrument for testing
 #self.patch('keyboard','instrument')

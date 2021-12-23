@@ -286,6 +286,7 @@ class Spark(NotesDrumKit):
         # C2 Chromatic
         super().__init__([60,61,62,63,64,65,66,67,68,69,70,71, 72,73,74,75])
 
+
 class RhythmModule:
     def __init__(self, q, clock_sink, cc_sink, notes_out, rhythm=POP1, drumkit=None, channel=10, ppq=48):
         q.createSink(clock_sink,self)
@@ -336,7 +337,7 @@ class RhythmModule:
             if event.obj.pulse != 0 and event.obj.pulse != self.ppq/2:
                 return
             for off_msg in self.notes_currently_on:
-                self.notes_out.add(Event(EVENT_MIDI,'debug',off_msg))
+                self.notes_out.add(Event(EVENT_MIDI,'rhythms',off_msg))
                 self.notes_currently_on = []
             parts = self.player.next()
             for part in parts:
