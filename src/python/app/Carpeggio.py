@@ -158,7 +158,6 @@ class Carpeggio(AbstractModule):
         return MAJOR_KEY_CHORDS[randrange(len(MAJOR_KEY_CHORDS))]
 
     def handle_clock(self, pulse):
-        self.time = pulse.time
         if pulse.pulse != 0:
             return
 
@@ -203,6 +202,10 @@ class Carpeggio(AbstractModule):
             self.notes_out.add(Event(EVENT_MIDI,'carpeggio',off_msg))
         for off_msg in self.drone_notes:
             self.notes_out.add(Event(EVENT_MIDI,'carpeggio.drone',off_msg))
+        for i in range(0,16):
+            note = self.root + self.current_sequence[i]
+            off_msg = mido.Message('note_off', note=note, channel=self.channel, time=self.time)
+            self.notes_out.add(Event(EVENT_MIDI,'carpeggio',off_msg))
 
 
 class CarpeggioRand(Carpeggio):
@@ -220,12 +223,13 @@ class CarpeggioGenerative(Carpeggio):
  
     def next_step(self, step):
         #print(hex(self.state))
-        curr = self.state & 0x000f
+        curr = self.state
         s = (self.state << 5) | ((self.state >> 11) & 0x001f)
         if random() < self.seq_prob:
             s = s ^ 0x0001
         self.state = s & 0x0000ffff
-        return curr
+        # This only uses the 8 notes of the 16 available, sounds better to me
+        return curr & 0x0007
 
     def next_chord(self, measure):
         r = random()

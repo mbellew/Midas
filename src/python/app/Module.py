@@ -10,13 +10,16 @@ class Module:
 class AbstractModule(Module):
     def __init__(self):
         self.ccmap = MidiMap()
+        self.time = -1
 
     def handle(self, event):
         if event.code == EVENT_CLOCK:
+            self.time = event.obj.time
             self.handle_clock(event.obj)
 
         if event.code == EVENT_STOP:
             self.handle_stop()
+            self.time = -1
 
         if event.code == EVENT_MIDI:
             msg = event.obj

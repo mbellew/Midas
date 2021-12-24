@@ -9,7 +9,11 @@ from app.StrumArpeggiator import StrumArpeggiator
 from app.StrumPattern import StrumPattern
 from app.Rhythms import *
 
+# I think this is most common
 PPQ = 24
+
+# channels are 0 based which is confusing, here are some constants
+(CH1,CH2,CH3,CH4,CH5,CH6,CH7,CH8,CH9,CH10,CH11,CH12,CH13,CH14,CH15,CH16) = range(0,16)
 
 __unique__ = 100
 

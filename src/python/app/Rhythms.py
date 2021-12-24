@@ -278,19 +278,31 @@ class VolcaBeats(NotesDrumKit):
     def __init__(self):
         super().__init__([36, 38, 43, 50, 42, 46, 39, 75, 67, 49])
 
-class MpcDrumTrack(NotesDrumKit):
+
+# One track with a DrumKit
+class MpcDrumKit(NotesDrumKit):
     def __init__(self):
         # C2 Major
         super().__init__([36,38,40,41,43,45,47, 48,50,52,53,55,57,59])
 
-class Spark(NotesDrumKit):
+# Multiple track with a DrumSynth
+class MpcDrumTracks(DrumKit):
     def __init__(self):
-        # C2 Chromatic
-        super().__init__([60,61,62,63,64,65,66,67,68,69,70,71, 72,73,74,75])
+        instruments = []
+        for channel in range(0,4):
+            on_msg  = mido.Message('note_on',channel=channel,note=48)
+            off_msg = mido.Message('note_off',channel=channel,note=48)
+            inst = {'on':on_msg, 'off':off_msg}
+            instruments.append(inst)
+        super().__init__(instruments)
+
+class Spark(NotesDrumKit):
+    def __init__(self, root=60):
+        super().__init__(range(root,root+16))
 
 
 class RhythmModule(AbstractModule):
-    def __init__(self, q, clock_sink, cc_sink, notes_out, rhythm=POP1, drumkit=None, channel=10, ppq=48):
+    def __init__(self, q, clock_sink, cc_sink, notes_out, rhythm=POP1, drumkit=None, channel=9, ppq=48):
         super().__init__()
         q.createSink(clock_sink,self)
         q.createSink(cc_sink,self)
@@ -338,20 +350,30 @@ class RhythmModule(AbstractModule):
         if pulse != 0 and pulse.pulse != self.ppq/2:
             return
         for off_msg in self.notes_currently_on:
+            off_msg.time = self.time
             self.notes_out.add(Event(EVENT_MIDI,'rhythms',off_msg))
             self.notes_currently_on = []
         parts = self.player.next()
         for part in parts:
             if part is not None:
                 on_msg = self.drumkit.note_on(self.instrument[part])
-                on_msg.channel = self.channel
+                if self.channel is not None:
+                    on_msg.channel = self.channel
                 off_msg = self.drumkit.note_off(self.instrument[part])
-                off_msg.channel = self.channel
+                if self.channel is not None:
+                    off_msg.channel = self.channel
                 self.notes_currently_on.append(off_msg)
+                on_msg.time = self.time
                 self.notes_out.add(Event(EVENT_MIDI,'rhythms',on_msg))
  
     def handle_stop(self):
         for off_msg in self.notes_currently_on:
+            off_msg.time = self.time
             self.notes_out.add(Event(EVENT_MIDI,'rhythms',off_msg))
         self.notes_currently_on = []
+
+        for i in range(0,self.drumkit.count()):
+            off_msg = self.drumkit.note_off(i)
+            off_msg.time = self.time
+            self.notes_out.add(Event(EVENT_MIDI,'rhythms',off_msg))
  

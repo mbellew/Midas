@@ -1,6 +1,6 @@
 from app.StrumPattern import StrumPattern
-from app.Application import DebugModule, Application, PPQ
-from app.Rhythms import RhythmModule, MpcDrumTrack, Spark, VolcaBeats
+from app.Application import *
+from app.Rhythms import RhythmModule, MpcDrumKit, MpcDrumTracks, Spark, VolcaBeats, MOTORIK3
 from app.Carpeggio import Carpeggio, CarpeggioRand, CarpeggioGenerative
 
 app = Application()
@@ -12,17 +12,16 @@ q = app.patchQueue
 
 StrumPattern(q, 'strumpattern_in', 'strumpattern_out')
 DebugModule(q, 'debug')
-#RhythmModule(q, "rhythm_clock_in", "rhythm_cc_in", "rhythm_out", drumkit=MpcDrumTrack(), channel=9, ppq=PPQ)
-RhythmModule(q, "rhythm_clock_in", "rhythm_cc_in", "rhythm_out", drumkit=Spark(), channel=9, ppq=PPQ)
-CarpeggioGenerative(q, "carpeggio_clock_in", "carpeggio_cc_in", "carpeggio_out", channel=8, drone=7, ppq=PPQ)
+RhythmModule(q, "rhythm_clock_in", "rhythm_cc_in", "rhythm_out", drumkit=Spark(60), channel=CH10, ppq=PPQ)
+CarpeggioGenerative(q, "carpeggio_clock_in", "carpeggio_cc_in", "carpeggio_out", channel=CH9, drone=CH8, ppq=PPQ, minor=False)
 
 # 
 # PATCH!
 #
 
 # USE THIS IF THERE IS NO EXTERNAL MIDI CLOCK
-#self.patch('internal_clock','timekeeper_in'
-#self.patch('knobs','internal_clock_cc')
+#app.patch('internal_clock','timekeeper_in')
+#app.patch('knobs','internal_clock_cc')
 
 # get clock from MPC over IAC Bus
 app.patch('IAC Driver Bus 1_clock','timekeeper_in')
