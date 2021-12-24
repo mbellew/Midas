@@ -2,38 +2,7 @@ import mido
 from random import random, randrange
 from app.MidiMap import MidiMap
 from app.Event import Event, EVENT_CLOCK, EVENT_MIDI, EVENT_STOP
-
-
-
-#TODO This is the start of a new abstract base class
-
-class AbstractModule:
-    def __init__(self):
-        self.ccmap = MidiMap()
-
-    def handle(self, event):
-        if event.code == EVENT_CLOCK:
-            self.handle_clock(event.obj)
-
-        if event.code == EVENT_STOP:
-            self.handle_stop()
-
-        if event.code == EVENT_MIDI:
-            msg = event.obj
-            if msg.type == 'control_change':
-                self.ccmap.dispatch(msg)
-
-            if msg.type == 'note_on' or msg.type == 'note_off':
-                self.handle_note(msg)
-
-    def handle_clock(pulse):
-        return
-
-    def handle_stop():
-        return
-
-    def handle_note(msg):
-        return
+from app.Module import AbstractModule
 
 
 # adapted from https://github.com/Chysn/O_C-HemisphereSuite/wiki/Carpeggio-Cartesian-Arpeggiator
@@ -171,11 +140,7 @@ class Carpeggio(AbstractModule):
         self.drone_channel = drone
         self.note_prob = 0.92
 
-        # step sequencer and chord sequencer functions
-        self.next_step_fn = lambda step : (step + 1) % 16
-        self.next_chord_fn = lambda measure : MAJOR_KEY_CHORDS[randrange(len(MAJOR_KEY_CHORDS))]
-
-        self.current_sequence = self.next_chord_fn(0)
+        self.current_sequence = self.next_chord(0)
         self.step = -1
 
         q.createSink(clock_sink,self)
@@ -185,7 +150,12 @@ class Carpeggio(AbstractModule):
         self.channel = channel
         self.notes_currently_on = []
         self.drone_notes = []
-        self.ccmap = MidiMap()
+
+    def next_step(step):
+        return (step + 1) % 16
+
+    def next_chord(measure):
+        return MAJOR_KEY_CHORDS[randrange(len(MAJOR_KEY_CHORDS))]
 
     def handle_clock(self, pulse):
         self.time = pulse.time
@@ -195,7 +165,7 @@ class Carpeggio(AbstractModule):
         # drone
         if self.drone_channel is not None and pulse.beat == 0:
             if pulse.measure%4 == 0:
-                self.current_sequence = self.next_chord_fn(pulse.measure)
+                self.current_sequence = self.next_chord(pulse.measure)
             if pulse.measure%1 == 0:
                 for off_msg in self.drone_notes:
                     off_msg.time = self.time
@@ -212,7 +182,7 @@ class Carpeggio(AbstractModule):
             off_msg.time = self.time
             self.notes_out.add(Event(EVENT_MIDI,'carpeggio',off_msg))
         self.notes_currently_on = []
-        self.step = self.next_step_fn(self.step)
+        self.step = self.next_step(self.step)
         start_of_sequence = ((pulse.measure%4)==0) and (pulse.beat == 0)
         note = self.root + self.current_sequence[self.step % 16]
         on_msg = mido.Message('note_on', note=note, channel=self.channel, time=self.time)
@@ -238,20 +208,17 @@ class Carpeggio(AbstractModule):
 class CarpeggioRand(Carpeggio):
     def __init__(self, q, clock_sink, cc_sink, notes_out, channel=9, ppq=48):
         super().__init__(q, clock_sink, cc_sink, notes_out, channel, ppq)
-        self.next_step_fn = lambda step : int(random() * 0xffffffff)
 
 
 class CarpeggioGenerative(Carpeggio):
     def __init__(self, q, clock_sink, cc_sink, notes_out, drone=None, channel=9, ppq=48, minor=False):
-        super().__init__(q, clock_sink, cc_sink, notes_out, drone=drone, channel=channel, ppq=ppq)
+        self.last_chord = -1
         self.minor = minor
+        super().__init__(q, clock_sink, cc_sink, notes_out, drone=drone, channel=channel, ppq=ppq)
         self.seq_prob = 0.05
         self.state = int(random() * 210343859341) & 0xffff
-        self.last_chord = -1
-        self.next_step_fn  = lambda step : self.next_step()
-        self.next_chord_fn = lambda measure : self.next_chord(measure)
-
-    def next_step(self):
+ 
+    def next_step(self, step):
         #print(hex(self.state))
         curr = self.state & 0x000f
         s = (self.state << 5) | ((self.state >> 11) & 0x001f)

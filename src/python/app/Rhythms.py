@@ -1,7 +1,9 @@
 from app.Event import * 
+from app.Module import AbstractModule
 import mido
 import random
 from app.MidiMap import MidiMap
+from app.Module import AbstractModule
 
 
 Rhythm_array = []
@@ -287,8 +289,9 @@ class Spark(NotesDrumKit):
         super().__init__([60,61,62,63,64,65,66,67,68,69,70,71, 72,73,74,75])
 
 
-class RhythmModule:
+class RhythmModule(AbstractModule):
     def __init__(self, q, clock_sink, cc_sink, notes_out, rhythm=POP1, drumkit=None, channel=10, ppq=48):
+        super().__init__()
         q.createSink(clock_sink,self)
         q.createSink(cc_sink,self)
         self.ppq = ppq
@@ -300,7 +303,6 @@ class RhythmModule:
         self.notes_currently_on = []
 
         self.player = Player(rhythm)
-        self.ccmap = MidiMap()
         self.ccmap.add( 0, lambda m : self.cc_rhythm(m))
         self.ccmap.add( 4, lambda m : self.cc_offset(m,1))
         self.ccmap.add( 9, lambda m : self.cc_offset(m,2))
@@ -332,23 +334,24 @@ class RhythmModule:
         i = int((msg.value/128.0) * count)
         self.instrument[ch] = i
 
-    def handle(self, event):
-        if event.code == EVENT_CLOCK:
-            if event.obj.pulse != 0 and event.obj.pulse != self.ppq/2:
-                return
-            for off_msg in self.notes_currently_on:
-                self.notes_out.add(Event(EVENT_MIDI,'rhythms',off_msg))
-                self.notes_currently_on = []
-            parts = self.player.next()
-            for part in parts:
-                if part is not None:
-                    on_msg = self.drumkit.note_on(self.instrument[part])
-                    on_msg.channel = self.channel
-                    off_msg = self.drumkit.note_off(self.instrument[part])
-                    off_msg.channel = self.channel
-                    self.notes_currently_on.append(off_msg)
-                    self.notes_out.add(Event(EVENT_MIDI,'rhythms',on_msg))
-        if event.code == EVENT_MIDI:
-            msg = event.obj
-            if msg.type == 'control_change':
-                self.ccmap.dispatch(msg)
+    def handle_clock(self, pulse):
+        if pulse != 0 and pulse.pulse != self.ppq/2:
+            return
+        for off_msg in self.notes_currently_on:
+            self.notes_out.add(Event(EVENT_MIDI,'rhythms',off_msg))
+            self.notes_currently_on = []
+        parts = self.player.next()
+        for part in parts:
+            if part is not None:
+                on_msg = self.drumkit.note_on(self.instrument[part])
+                on_msg.channel = self.channel
+                off_msg = self.drumkit.note_off(self.instrument[part])
+                off_msg.channel = self.channel
+                self.notes_currently_on.append(off_msg)
+                self.notes_out.add(Event(EVENT_MIDI,'rhythms',on_msg))
+ 
+    def handle_stop(self):
+        for off_msg in self.notes_currently_on:
+            self.notes_out.add(Event(EVENT_MIDI,'rhythms',off_msg))
+        self.notes_currently_on = []
+ 
