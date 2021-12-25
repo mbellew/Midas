@@ -85,12 +85,18 @@ class Pulse:
     """can't really extends mido.Message so use our own internal class"""
     def __init__(self, midi, sig):
         global MIDI_CLOCK_MESSAGE
+        # these are position variables
         self.time  = midi.time                                                  # current pulse since 'start' (zero based)
-        self.beat  = int((self.time % sig.pulses_per_measure) / sig.pulses_per_beat)                       # zero-based "0 and 1 and 2 and 3 and"
-        self.measure = int(self.time / sig.pulses_per_measure)                     # count of measures since 'start'
-        self.pulse   = int(self.time % sig.pulses_per_beat)                          # pulse count in current beat 0-23 
-        self.pos     = (self.time % sig.pulses_per_beat) / sig.pulses_per_beat     # progress in current beat 0-1.0 (e.g 1/8 note is 0.5)
- 
+        self.beat_num      = int((self.time % sig.pulses_per_measure) / sig.pulses_per_beat)                       # zero-based "0 and 1 and 2 and 3 and"
+        self.measure_num   = int(self.time / sig.pulses_per_measure)                     # count of measures since 'start'
+        self.pulse_in_beat = int(self.time % sig.pulses_per_beat)                          # pulse count in current beat 0-23 
+        self.pos_in_beat   = self.pulse_in_beat / sig.pulses_per_beat     # progress in current beat 0-1.0 (e.g 1/8 note is 0.5)
+        # these are trigger variables
+        self.measure   = (self.time % sig.pulses_per_measure) == 0
+        self.quarter   = (self.time % sig.pulses_per_beat) == 0
+        self.eighth    = (self.time % int(sig.pulses_per_beat/2)) == 0
+        self.sixteenth = (self.time % int(sig.pulses_per_beat/4)) == 0
+
     def __str__(self):
         return str(vars(self))
 

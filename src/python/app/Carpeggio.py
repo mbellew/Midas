@@ -113,22 +113,22 @@ def generate_sequence(chord_desc,root=36):
 
 
 MAJOR_KEY_CHORDS = [
-            generate_sequence("Maj triad",0),  #C   I
-            generate_sequence("min triad",2),  #D   ii
-            generate_sequence("min triad",4),  #E   iii
-            generate_sequence("Maj triad",5),  #F   IV
-            generate_sequence("Maj triad",7),  #G   V
-            generate_sequence("min triad",9),  #A   vi
-            generate_sequence("dim triad",11)  #B   viio Diminished triad
+    (find_chord("Maj triad"),0),  #C   I
+    (find_chord("min triad"),2),  #D   ii
+    (find_chord("min triad"),4),  #E   iii
+    (find_chord("Maj triad"),5),  #F   IV
+    (find_chord("Maj triad"),7),  #G   V
+    (find_chord("min triad"),9),  #A   vi
+    (find_chord("dim triad"),11)  #B   viio Diminished triad
 ]
 MINOR_KEY_CHORDS = [
-            generate_sequence("min triad",0),  #C   i
-            generate_sequence("dim triad",2),  #D   iio Diminished triad
-            generate_sequence("aug triad",4),  #E   III+ Augmented triad
-            generate_sequence("min triad",5),  #F   iv
-            generate_sequence("Maj triad",7),  #G   V
-            generate_sequence("Maj triad",9),  #A   VI
-            generate_sequence("dim triad",11)  #B   viio Diminished triad
+    (find_chord("min triad"),0),  #C   i
+    (find_chord("dim triad"),2),  #D   iio Diminished triad
+    (find_chord("aug triad"),4),  #E   III+ Augmented triad
+    (find_chord("min triad"),5),  #F   iv
+    (find_chord("Maj triad"),7),  #G   V
+    (find_chord("Maj triad"),9),  #A   VI
+    (find_chord("dim triad"),1)  #B   viio Diminished triad
 ]
 
 
@@ -140,7 +140,7 @@ class Carpeggio(AbstractModule):
         self.drone_channel = drone
         self.note_prob = 0.92
 
-        self.current_sequence = self.next_chord(0)
+        self.update_chord(0)
         self.step = -1
 
         q.createSink(clock_sink,self)
@@ -151,21 +151,30 @@ class Carpeggio(AbstractModule):
         self.notes_currently_on = []
         self.drone_notes = []
 
-    def next_step(step):
-        return (step + 1) % 16
+    def update_chord(self, measure):
+        pair = self.next_chord(measure)
+        self.arp_chord = pair[0]
+        self.chord_offset = pair[1]
+        self.current_sequence = self.arp_chord.generate_sequence(self.root + self.chord_offset)
+
+    def next_step(self, pulse):
+        return (self.step + 1) % 16
 
     def next_chord(measure):
         return MAJOR_KEY_CHORDS[randrange(len(MAJOR_KEY_CHORDS))]
 
     def handle_clock(self, pulse):
-        if pulse.pulse != 0:
+
+        trigger = self.trigger(pulse)
+
+        if not trigger and not pulse.quarter:
             return
 
         # drone
-        if self.drone_channel is not None and pulse.beat == 0:
-            if pulse.measure%4 == 0:
-                self.current_sequence = self.next_chord(pulse.measure)
-            if pulse.measure%1 == 0:
+        if self.drone_channel is not None and pulse.measure:
+            if pulse.measure_num % 4 == 0:
+                self.update_chord(pulse.measure)
+            if pulse.measure_num % 4 == 0:
                 for off_msg in self.drone_notes:
                     off_msg.time = self.time
                     self.notes_out.add(Event(EVENT_MIDI,'carpeggio.drone',off_msg))
@@ -177,24 +186,27 @@ class Carpeggio(AbstractModule):
                 self.notes_out.add(Event(EVENT_MIDI,'carpeggio.drone',on_msg))
 
         # bass motif
-        for off_msg in self.notes_currently_on:
-            off_msg.time = self.time
-            self.notes_out.add(Event(EVENT_MIDI,'carpeggio',off_msg))
+        if trigger or pulse.quarter:
+            for off_msg in self.notes_currently_on:
+                off_msg.time = self.time
+                self.notes_out.add(Event(EVENT_MIDI,'carpeggio',off_msg))
         self.notes_currently_on = []
-        self.step = self.next_step(self.step)
-        start_of_sequence = ((pulse.measure%4)==0) and (pulse.beat == 0)
-        note = self.root + self.current_sequence[self.step % 16]
-        on_msg = mido.Message('note_on', note=note, channel=self.channel, time=self.time)
-        if start_of_sequence:
-            on_msg.note = self.root + self.current_sequence[0]
-            on_msg.velocity = min(127,int(on_msg.velocity*1.5))
-        elif random() > self.note_prob:
-            on_msg.velocity = 0
-        elif pulse.beat == 0:
-            on_msg.velocity = min(127,int(on_msg.velocity*1.25))
-        off_msg = mido.Message('note_off', note=note, channel=self.channel)
-        self.notes_currently_on.append(off_msg)
-        self.notes_out.add(Event(EVENT_MIDI,'carpeggio',on_msg))
+
+        if trigger:
+            self.step = self.next_step(pulse)
+            note = self.root + self.current_sequence[self.step % 16]
+            on_msg = mido.Message('note_on', note=note, channel=self.channel, time=self.time)
+            if random() > self.note_prob:
+                on_msg.velocity = 0
+            elif pulse.measure:
+                on_msg.velocity = min(127,int(on_msg.velocity*1.25))
+            off_msg = mido.Message('note_off', note=note, channel=self.channel)
+            self.notes_currently_on.append(off_msg)
+            self.notes_out.add(Event(EVENT_MIDI,'carpeggio',on_msg))
+
+    # by default play every quarter note
+    def trigger(self, pulse):
+        return pulse.beat
 
 
     def handle_stop(self):
@@ -213,21 +225,55 @@ class CarpeggioRand(Carpeggio):
         super().__init__(q, clock_sink, cc_sink, notes_out, channel, ppq)
 
 
+def rotate_word_right(w, n):
+    n = n % 16
+    r = ((w & 0x0000ffff) >> n) | ((w << (16-n)) & 0x0000ffff)
+    return r
+
+def start_of_bar(pulse):
+    return pulse.measure and pulse.measure_num % 4 == 0
+
 class CarpeggioGenerative(Carpeggio):
-    def __init__(self, q, clock_sink, cc_sink, notes_out, drone=None, channel=9, ppq=48, minor=False):
+    def __init__(self, q, clock_sink, cc_sink, notes_out, drone=None, channel=9, ppq=24, minor=False):
         self.last_chord = -1
         self.minor = minor
         super().__init__(q, clock_sink, cc_sink, notes_out, drone=drone, channel=channel, ppq=ppq)
         self.seq_prob = 0.05
-        self.state = int(random() * 210343859341) & 0xffff
+        self.register = int(random() * 210343859341) & 0xffff
+        self.register_rotation = 0
+
+        # generate random triggers for 32 steps
+        # euclidian pattern?  evolving pattern?
+        self.triggers = [False] * 32
+        r = 0
+        for i in range(0, randrange(15,21)):
+            self.triggers[r%32] = True
+            r = r + 4 + randrange(0,4)
+        self.trigger_step = 0
+        self.eighths = int(ppq/2)
+
+    def trigger(self, pulse):
+        if not pulse.eighth:
+            return
+        if start_of_bar(pulse):
+            self.trigger_step = 0
+        t = self.triggers[self.trigger_step]
+        self.trigger_step = self.trigger_step+1
+        return t
  
-    def next_step(self, step):
+    def next_step(self, pulse):
+        if start_of_bar(pulse):
+            # 'restart' sequene
+            self.register_rotation = self.register_rotation % 16
+            self.register = rotate_word_right(self.register, 16-self.register_rotation)
+            self.register_rotation = 0
+
         #print(hex(self.state))
-        curr = self.state
-        s = (self.state << 5) | ((self.state >> 11) & 0x001f)
+        curr = self.register
+        self.register = rotate_word_right(self.register, 5)
+        self.register_rotation = self.register_rotation + 5
         if random() < self.seq_prob:
-            s = s ^ 0x0001
-        self.state = s & 0x0000ffff
+            self.register = self.register ^ 0x0001
         # This only uses the 8 notes of the 16 available, sounds better to me
         return curr & 0x0007
 

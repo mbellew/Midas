@@ -347,7 +347,7 @@ class RhythmModule(AbstractModule):
         self.instrument[ch] = i
 
     def handle_clock(self, pulse):
-        if pulse != 0 and pulse.pulse != self.ppq/2:
+        if not pulse.eighth:
             return
         for off_msg in self.notes_currently_on:
             off_msg.time = self.time
