@@ -17,8 +17,8 @@ class ArpChord:
     def generate_sequence(self, root):
         sequence = [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]
         for s in range(0,16):
-            oct = (s / self.nr_notes) % 3
-            tone = s % self.nr_notes
+            oct = int(s / self.nr_notes) % 3
+            tone = int(s % self.nr_notes)
             sequence[s] = int(self.chord_tones[tone] + (12 * oct) + root)
         return sequence
 
@@ -118,8 +118,8 @@ MAJOR_KEY_CHORDS = [
     (find_chord("min triad"),4),  #E   iii
     (find_chord("Maj triad"),5),  #F   IV
     (find_chord("Maj triad"),7),  #G   V
-    (find_chord("min triad"),9),  #A   vi
-    (find_chord("dim triad"),11)  #B   viio Diminished triad
+    (find_chord("min triad"),-3),  #A   vi
+    (find_chord("dim triad"),-1)  #B   viio Diminished triad
 ]
 MINOR_KEY_CHORDS = [
     (find_chord("min triad"),0),  #C   i
@@ -127,16 +127,16 @@ MINOR_KEY_CHORDS = [
     (find_chord("aug triad"),4),  #E   III+ Augmented triad
     (find_chord("min triad"),5),  #F   iv
     (find_chord("Maj triad"),7),  #G   V
-    (find_chord("Maj triad"),9),  #A   VI
-    (find_chord("dim triad"),1)  #B   viio Diminished triad
+    (find_chord("Maj triad"),-3),  #A   VI
+    (find_chord("dim triad"),-1)  #B   viio Diminished triad
 ]
 
 
 class Carpeggio(AbstractModule):
-    def __init__(self, q, clock_sink, cc_sink, notes_out, channel=9, drone=None, ppq=48):
+    def __init__(self, q, clock_sink, cc_sink, notes_out, channel=9, drone=None, ppq=48, root=36):
         super().__init__()
         self.time = -1
-        self.root = 36
+        self.root = root
         self.drone_channel = drone
         self.note_prob = 0.92
 
@@ -179,7 +179,7 @@ class Carpeggio(AbstractModule):
                     off_msg.time = self.time
                     self.notes_out.add(Event(EVENT_MIDI,'carpeggio.drone',off_msg))
                 self.drone_notes = []
-                note = self.root + self.current_sequence[0]
+                note = self.current_sequence[0]
                 on_msg = mido.Message('note_on', note=note, channel=self.drone_channel, time=self.time)
                 off_msg = mido.Message('note_off', note=note, channel=self.drone_channel)
                 self.drone_notes.append(off_msg)
@@ -194,7 +194,7 @@ class Carpeggio(AbstractModule):
 
         if trigger:
             self.step = self.next_step(pulse)
-            note = self.root + self.current_sequence[self.step % 16]
+            note = self.current_sequence[self.step % 16]
             on_msg = mido.Message('note_on', note=note, channel=self.channel, time=self.time)
             if random() > self.note_prob:
                 on_msg.velocity = 0
@@ -215,7 +215,7 @@ class Carpeggio(AbstractModule):
         for off_msg in self.drone_notes:
             self.notes_out.add(Event(EVENT_MIDI,'carpeggio.drone',off_msg))
         for i in range(0,16):
-            note = self.root + self.current_sequence[i]
+            note = self.current_sequence[i]
             off_msg = mido.Message('note_off', note=note, channel=self.channel, time=self.time)
             self.notes_out.add(Event(EVENT_MIDI,'carpeggio',off_msg))
 
@@ -295,10 +295,8 @@ class CarpeggioGenerative(Carpeggio):
             c = 5       #VI
         else:
             c = 6       #VII
-        if c != self.last_chord:
-            self.last_chord = c
-        else:
-            self.last_chord = randrange(0,7)
+        if c == self.last_chord:
+            c = randrange(0,7)
         print("CHORD " + str(c+1))
         if self.minor:
             return MINOR_KEY_CHORDS[self.last_chord]
