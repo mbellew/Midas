@@ -299,6 +299,6 @@ class CarpeggioGenerative(Carpeggio):
             c = randrange(0,7)
         print("CHORD " + str(c+1))
         if self.minor:
-            return MINOR_KEY_CHORDS[self.last_chord]
+            return MINOR_KEY_CHORDS[c]
         else:
-            return MAJOR_KEY_CHORDS[self.last_chord]
+            return MAJOR_KEY_CHORDS[c]
