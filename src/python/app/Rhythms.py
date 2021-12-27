@@ -266,6 +266,72 @@ class DrumKit:
     def count(self) -> int:
         return len(self.instruments)
 
+# https://soundprogramming.net/file-formats/general-midi-drum-note-numbers/
+GeneralMidiDrum = {
+    "High Q":27,
+    "Slap":28,
+    "Scratch Push":29,
+    "Scratch Pull":30,
+    "Sticks":31,
+    "Square Click":32,
+    "Metronome Click":33,
+    "Metronome Bell":34,
+    "Bass Drum 2":35,
+    "Bass Drum 1":36,
+    "Side Stick":37,
+    "Snare Drum 1":38,
+    "Hand Clap":39,
+    "Snare Drum 2":40,
+    "Low Tom 2":41,
+    "Closed Hi-hat":42,
+    "Low Tom 1":43,
+    "Pedal Hi-hat":44,
+    "Mid Tom 2":45,
+    "Open Hi-hat":46,
+    "Mid Tom 1":47,
+    "High Tom 2":48,
+    "Crash Cymbal 1":49,
+    "High Tom 1":50,
+    "Ride Cymbal 1":51,
+    "Chinese Cymbal":52,
+    "Ride Bell":53,
+    "Tambourine":54,
+    "Splash Cymbal":55,
+    "Cowbell":56,
+    "Crash Cymbal 2":57,
+    "Vibra Slap":58,
+    "Ride Cymbal 2":59,
+    "High Bongo":60,
+    "Low Bongo":61,
+    "Mute High Conga":62,
+    "Open High Conga":63,
+    "Low Conga":64,
+    "High Timbale":65,
+    "Low Timbale":66,
+    "High Agogo":67,
+    "Low Agogo":68,
+    "Cabasa":69,
+    "Maracas":70,
+    "Short Whistle":71,
+    "Long Whistle":72,
+    "Short Guiro":73,
+    "Long Guiro":74,
+    "Claves":75,
+    "High Wood Block":76,
+    "Low Wood Block":77,
+    "Mute Cuica":78,
+    "Open Cuica":79,
+    "Mute Triangle":80,
+    "Open Triangle":81,
+    "Shaker":82,
+    "Jingle Bell":83,
+    "Belltree":84,
+    "Castanets":85,
+    "Mute Surdo":86,
+    "Open Surdo":87
+}
+            
+
 class NotesDrumKit(DrumKit):
     def __init__(self, notes):
         instruments = []
@@ -274,28 +340,60 @@ class NotesDrumKit(DrumKit):
             instruments.append(inst)
         super().__init__(instruments)
 
-class VolcaBeats(NotesDrumKit):
+
+class GeneralMidiDrum(DrumKit):
+    def __init__(names):
+        notes = []
+        for name in names:
+            if not name in GeneralMidiDrum:
+                raise Exception("Drum not found: " + name)
+            notes.append(GeneralMidiDrum[name])
+            super().__init__(notes)
+
+
+class VolcaBeats(GeneralMidiDrum):
     def __init__(self):
-        super().__init__([36, 38, 43, 50, 42, 46, 39, 75, 67, 49])
+        #super().__init__([36, 38, 43, 50, 42, 46, 39, 75, 67, 49])
+        super().__init__("Bass Drum 1","Snare Drum 1","Low Tom 1","High Tom 1","Closed Hi-hat","Open Hi-hat",
+            "Hand Clap","Claves","High Agogo","Crash Cymbal 1")
 
 
-# One track with a DrumKit
+# Key mapping seems to vary by drum kit!, but often follows GeneralMidiDrum numbering
+# recommend using "Edit/Program/Note Mapping..." to pick a predefined key mapping OR match Spark() pattern C6 semi-tones
 class MpcDrumKit(NotesDrumKit):
     def __init__(self):
         # C2 Major
         super().__init__([36,38,40,41,43,45,47, 48,50,52,53,55,57,59])
 
-# Multiple track with a DrumSynth
-class MpcDrumTracks(DrumKit):
+# This is built-in MPC mapping "Chromatic C1"
+class MpcPadsChromaticC1(NotesDrumKit):
     def __init__(self):
-        instruments = []
-        for channel in range(0,4):
-            on_msg  = mido.Message('note_on',channel=channel,note=48)
-            off_msg = mido.Message('note_off',channel=channel,note=48)
-            inst = {'on':on_msg, 'off':off_msg}
-            instruments.append(inst)
-        super().__init__(instruments)
+        super().__init(range(36,36+16))
 
+# This is built-in MPC mapping "Chromatic C-2"
+class MpcPadsChromaticMidi0(NotesDrumKit):
+    def __init__(self):
+        super().__init__(range(0,16))
+
+# This is built-in MPC mapping "Classic MPC"
+class MpcPadsClassic(NotesDrumKit):
+    def __init__(self):
+        super().__init([37,36,42,82,40,38,46,44,48,47,45,43,49,55,51,53])
+
+
+# Multiple track with a DrumSynth
+#class MpcDrumTracks(DrumKit):
+#    def __init__(self):
+#        instruments = []
+#        for channel in range(0,4):
+#            on_msg  = mido.Message('note_on',channel=channel,note=48)
+#            off_msg = mido.Message('note_off',channel=channel,note=48)
+#            inst = {'on':on_msg, 'off':off_msg}
+#            instruments.append(inst)
+#        super().__init__(instruments)
+
+
+# 16 sequential semi-tones starting at 60
 class Spark(NotesDrumKit):
     def __init__(self, root=60):
         super().__init__(range(root,root+16))
