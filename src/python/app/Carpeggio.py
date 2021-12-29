@@ -15,9 +15,10 @@ class ArpChord:
         self.octave_span = octave_span
 
     def generate_sequence(self, root):
+        octaves = 2
         sequence = [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]
         for s in range(0,16):
-            oct = int(s / self.nr_notes) % 3
+            oct = int(s / self.nr_notes) % octaves
             tone = int(s % self.nr_notes)
             sequence[s] = int(self.chord_tones[tone] + (12 * oct) + root)
         return sequence
@@ -175,15 +176,23 @@ class Carpeggio(AbstractModule):
             if pulse.measure_num % 4 == 0:
                 self.update_chord(pulse.measure)
             if pulse.measure_num % 4 == 0:
-                for off_msg in self.drone_notes:
-                    off_msg.time = self.time
-                    self.notes_out.add(Event(EVENT_MIDI,'carpeggio.drone',off_msg))
+                current_notes_on = self.drone_notes
                 self.drone_notes = []
+                off_on = True
+                if off_on:
+                    for off_msg in current_notes_on:
+                        off_msg.time = self.time
+                        self.notes_out.add(Event(EVENT_MIDI,'carpeggio.drone',off_msg))
                 note = self.current_sequence[0]
                 on_msg = mido.Message('note_on', note=note, channel=self.drone_channel, time=self.time)
                 off_msg = mido.Message('note_off', note=note, channel=self.drone_channel)
                 self.drone_notes.append(off_msg)
                 self.notes_out.add(Event(EVENT_MIDI,'carpeggio.drone',on_msg))
+                if not off_on:
+                    for off_msg in current_notes_on:
+                        off_msg.time = self.time
+                        self.notes_out.add(Event(EVENT_MIDI,'carpeggio.drone',off_msg))
+                    self.drone_notes = []
 
         # bass motif
         if trigger or pulse.quarter:
@@ -246,9 +255,9 @@ class CarpeggioGenerative(Carpeggio):
         # euclidian pattern?  evolving pattern?
         self.triggers = [False] * 32
         r = 0
-        for i in range(0, randrange(15,21)):
+        for i in range(0, randrange(20,24)):
             self.triggers[r%32] = True
-            r = r + 4 + randrange(0,4)
+            r = r + randrange(4,6)
         self.trigger_step = 0
         self.eighths = int(ppq/2)
 

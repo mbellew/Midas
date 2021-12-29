@@ -267,7 +267,7 @@ class DrumKit:
         return len(self.instruments)
 
 # https://soundprogramming.net/file-formats/general-midi-drum-note-numbers/
-GeneralMidiDrum = {
+GeneralMidiDrumMap = {
     "High Q":27,
     "Slap":28,
     "Scratch Push":29,
@@ -338,24 +338,25 @@ class NotesDrumKit(DrumKit):
         for i in range(0,len(notes)):
             inst = {'on':mido.Message('note_on',note=notes[i]), 'off':mido.Message('note_off',note=notes[i]) }
             instruments.append(inst)
-        super().__init__(instruments)
+        super().__init__(instruments)   
 
 
-class GeneralMidiDrum(DrumKit):
-    def __init__(names):
+class GeneralMidiDrumKit(NotesDrumKit):
+    def __init__(self,names):
+        global GeneralMidiDrumMap
         notes = []
         for name in names:
-            if not name in GeneralMidiDrum:
+            if not name in GeneralMidiDrumMap:
                 raise Exception("Drum not found: " + name)
-            notes.append(GeneralMidiDrum[name])
+            notes.append(GeneralMidiDrumMap[name])
             super().__init__(notes)
 
 
-class VolcaBeats(GeneralMidiDrum):
+class VolcaBeats(GeneralMidiDrumKit):
     def __init__(self):
         #super().__init__([36, 38, 43, 50, 42, 46, 39, 75, 67, 49])
-        super().__init__("Bass Drum 1","Snare Drum 1","Low Tom 1","High Tom 1","Closed Hi-hat","Open Hi-hat",
-            "Hand Clap","Claves","High Agogo","Crash Cymbal 1")
+        super().__init__(["Bass Drum 1","Snare Drum 1","Low Tom 1","High Tom 1","Closed Hi-hat","Open Hi-hat",
+            "Hand Clap","Claves","High Agogo","Crash Cymbal 1"])
 
 
 # Key mapping seems to vary by drum kit!, but often follows GeneralMidiDrum numbering
