@@ -1,3 +1,28 @@
+# adapted from https://github.com/Chysn/O_C-HemisphereSuite/wiki/Carpeggio-Cartesian-Arpeggiator
+"""
+// Copyright (c) 2018, Jason Justian
+//
+// Chord library (c) 2018, Roel Das
+//
+// Permission is hereby granted, free of charge, to any person obtaining a copy
+// of this software and associated documentation files (the "Software"), to deal
+// in the Software without restriction, including without limitation the rights
+// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+// copies of the Software, and to permit persons to whom the Software is
+// furnished to do so, subject to the following conditions:
+//
+// The above copyright notice and this permission notice shall be included in all
+// copies or substantial portions of the Software.
+//
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+// SOFTWARE.
+"""
+
 import mido
 from random import random, randrange
 from app.MidiMap import MidiMap
@@ -123,13 +148,6 @@ class CarpeggioGenerative(Carpeggio):
         super().__init__(q, clock_sink, cc_sink, notes_out, drone=drone, root=root, channel=channel, ppq=ppq)
         self.seq_prob = 0.05
         self.register = int(random() * 210343859341) & 0xffff
-
-
-
-
-
-
-
         self.register_rotation = 0
 
         # generate random triggers for 32 steps
