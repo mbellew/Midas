@@ -67,40 +67,40 @@ class DebugSendNotes:
 
 
 class MidiInputStep:
-    def __init__(self, q, point, port, clock=None):
-        self.port = port
+    def __init__(self, q, port_name, point, clock=None):
+        #self.port = mido.open_input(port_name, callback=lambda m : self.on_message(m))
+        self.port = mido.open_input(port_name)
         self.point = q.createSource(point)
-        self.clock = None if clock is None else q.createSource(clock)
-    
+        self.clock = None if clock is None else q.createSource(clock)    
 
     def process(self):
         new_events = False
         if self.port:
             for msg in self.port.iter_pending():
-                if msg.type=='aftertouch':
-                    continue
-                if self.clock and (msg.type == 'clock' or msg.type == 'stop' or msg.type == 'songpos' or msg.type == 'continue'):
-                    self.clock.add(Event(EVENT_MIDI,self.port.name,msg))
-                else:
-                    self.point.add(Event(EVENT_MIDI,self.port.name,msg))
+                self.on_message(msg)
                 new_events = True
         return new_events
 
+    def on_message(self,msg):
+        if msg.type=='aftertouch':
+            return
+        if self.clock and (msg.type == 'clock' or msg.type == 'stop' or msg.type == 'songpos' or msg.type == 'continue'):
+            self.clock.add(Event(EVENT_MIDI,self.port.name,msg))
+        else:
+            self.point.add(Event(EVENT_MIDI,self.port.name,msg))
 
 
-class MidiOutModule:
+class MidiOutModule(AbstractModule):
     def __init__(self, q, sink, port):
         q.createSink(sink, self)
         self.port = port
 
-    def handle(self, event):
-        if EVENT_MIDI != event.code:
-            return
-        msg = event.obj
+    def handle_note(self, msg):
         if self.port:
             self.port.send(msg)
-        return EVENT_DONE
 
+    def handle_clock(self, pulse):
+        self.handle_note(pulse.msg)
 
 
 class MidiChannelFilter:
@@ -134,7 +134,9 @@ class PassthroughModule:
         if not sink_name:
             sink_name = unique_name("passthrough_")
         self.sink = q.createSink(sink_name, self)
-        self.output_point = q.createSource(source_name)
+        self.source_name = source_name
+        self.output_point = q.createSource(self.source_name)
+        self.isPassthroughModule = True
 
     def handle(self, event):
         if EVENT_MIDI != event.code:
@@ -159,8 +161,7 @@ class Application:
         #
 
         q = self.patchQueue
-        self.internal_clock = InternalClock(q, 'internal_clock', 180, PPQ)
-        self.steps.append( self.internal_clock )
+        self.internal_clock = InternalClock(q, 'internal_clock', 90, PPQ)
         TimeKeeper( self.patchQueue, 'timekeeper_in', 'clock', PPQ)
         self.steps.append( self.patchQueue )
         self.patch('clock', 'queue_clock_in')
@@ -222,8 +223,16 @@ class Application:
         
         # create a source for every input
         for name in names:
-            step = MidiInputStep(q, name + "_in", mido.open_input(name), name + "_clock")
-            self.steps.append(step)
+            # skip twister if I'm using it for MPC
+            #if name.startswith("Midi Fighter Twister"):
+            #    continue
+            try:
+                step = MidiInputStep(q, name, name + "_in", name + "_clock")
+                # We don't need to do this if MidiInputStep uses callback
+                self.steps.append(step)
+            except:
+                print("ERROR: failed to open port '" + name + "'")
+                continue
 
         # create "keyboard" source
 
@@ -344,6 +353,10 @@ class Application:
 
 
     def main(self):
+        # add Internal clock to steps if it is patched to anything
+        if 'internal_clock' in self.patchQueue.patches:
+           self.steps.insert( 0, self.internal_clock )
+    
         self.print_patch()
         self.patchQueue.optimize()
         while True:
