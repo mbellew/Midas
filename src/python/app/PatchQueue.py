@@ -1,6 +1,11 @@
 from app.DelayQueue import DelayQueue
 from app.Event import EVENT_CLOCK
+from threading import RLock
 
+
+# we want to act more or less single threaded, dispatchEvent is a good choke-point
+#_THREAD_LOCK_ = RLock()
+_THREAD_LOCK_ = None
 
 SINK_POINT = 100
 SOURCE_POINT = 201
@@ -87,8 +92,34 @@ class PatchQueue:
 
 
     def optimize(self):
-        """Doesn't do anyting yet, but could"""
-        pass
+        for i in range(0,20):
+            if not self.optimize_pass():
+                return
+
+    def optimize_pass(self):
+        # for each source if it only has one patch, and that patch has a handler, then short-circuit
+        changed = 0
+        for source_name in self.points:
+            source = self.points[source_name]
+            if source.inout != SOURCE_POINT:
+                continue
+            if source.handler or not source_name in self.patches:
+                continue
+            patch_sinks = self.patches[source_name]
+            sinks = []
+            for s in patch_sinks:
+                if str(type(s.handler)) == "<class 'app.Application.PassthroughModule'>": # i'm not proud of that hack
+                    if self.patches.get(s.handler.source_name):
+                        sinks.extend(self.patches[s.handler.source_name])
+                        changed = changed+1
+                else:
+                    sinks.append(s)
+                
+            if sinks and len(sinks) == 1 and sinks[0].handler:
+                del self.patches[source_name]
+                source.handler = sinks[0].handler
+                changed = changed + 1
+        return changed > 0
 
 
     def createPatch(self, src, dst):
@@ -159,6 +190,7 @@ class PatchQueue:
 
 
     def dispatchEvent(self, event, point):
+        _THREAD_LOCK_ and _THREAD_LOCK_.acquire()
         if point.handler:
             if point.handler.handle:
                 point.handler.handle(event)
@@ -169,6 +201,7 @@ class PatchQueue:
             points = self.patches[point.name]
             for p in points:
                 self.dispatchEvent(event, p)
+        _THREAD_LOCK_ and _THREAD_LOCK_.release()
 
 
 
