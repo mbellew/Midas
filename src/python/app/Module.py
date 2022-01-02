@@ -16,24 +16,26 @@ class AbstractModule(Module):
         if event.code == EVENT_CLOCK:
             self.time = event.obj.time
             self.handle_clock(event.obj)
-
-        if event.code == EVENT_STOP:
+        elif event.code == EVENT_MIDI:
+            self.handle_midi(event.obj)
+        elif event.code == EVENT_STOP:
             self.handle_stop()
             self.time = -1
 
-        if event.code == EVENT_MIDI:
-            msg = event.obj
-            if msg.type == 'control_change':
-                self.ccmap.dispatch(msg)
+    def handle_midi(self, msg):
+        if msg.type == 'control_change':
+            self.handle_cc(msg)
+        elif msg.type == 'note_on' or msg.type == 'note_off':
+            self.handle_note(msg)
 
-            if msg.type == 'note_on' or msg.type == 'note_off':
-                self.handle_note(msg)
+    def handle_cc(self,msg):
+        self.ccmap.dispatch(msg)
 
-    def handle_clock(pulse):
+    def handle_clock(self,pulse):
         return
 
-    def handle_stop():
+    def handle_stop(self):
         return
 
-    def handle_note(msg):
+    def handle_note(self,msg):
         return
