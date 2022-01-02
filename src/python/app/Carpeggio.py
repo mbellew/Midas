@@ -3,134 +3,8 @@ from random import random, randrange
 from app.MidiMap import MidiMap
 from app.Event import Event, EVENT_CLOCK, EVENT_MIDI, EVENT_STOP
 from app.Module import AbstractModule
+from app.Chords import *
 
-
-# adapted from https://github.com/Chysn/O_C-HemisphereSuite/wiki/Carpeggio-Cartesian-Arpeggiator
-
-class ArpChord:
-    def __init__(self, name, tones, nr_notes, octave_span):
-        self.chord_name = name
-        self.chord_tones = tones
-        self.nr_notes = nr_notes
-        self.octave_span = octave_span
-
-    def generate_sequence(self, root):
-        octaves = 2
-        sequence = [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]
-        for s in range(0,16):
-            oct = int(s / self.nr_notes) % octaves
-            tone = int(s % self.nr_notes)
-            sequence[s] = int(self.chord_tones[tone] + (12 * oct) + root)
-        return sequence
-
-
-arp_chords = [
-  #ARPEGGIATE
-  ArpChord("Maj triad",[0, 4, 7], 3,1),
-  ArpChord("Maj inv 1",[4, 7, 12], 3,1),
-  ArpChord("Maj inv 2",[7, 12, 16], 3,1),
-  ArpChord("min triad",[0, 3, 7], 3,1),
-  ArpChord("min inv 1",[3, 7, 12], 3,1),
-  ArpChord("min inv 2",[7, 12, 15], 3,1),
-  ArpChord("dim triad",[0, 3, 6],3,1),
-  ArpChord("Octaves",[0],1,1),
-  ArpChord("1 5",[0, 7],2,1),
-
-  ArpChord("aug triad",[0, 4, 8],3,1),
-  ArpChord("sus2",[0,2,7],3,1),
-  ArpChord("sus4",[0,5,7],3,1),
-  ArpChord("add2",[0,2,4,7],4,1),
-  ArpChord("min(add2)",[0,2,3,7],4,1),
-
-  ArpChord("add4",[0,4,5,7],4,1),
-  ArpChord("min(+4)",[0,3,5,7],4,1),
-  ArpChord("sus4(+2)",[0,2,6,7],4,1),
-  ArpChord("12345",[0,2,4,5,7],5,1),
-  ArpChord("12b345",[0,2,3,5,7],5,1),
-
-  ArpChord("add(#11)",[0,4,6,7],4,1),
-  ArpChord("Maj6",[0,4,7,9],4,1),
-  ArpChord("min6",[0,3,7,9],4,1),
-  ArpChord("Maj7",[0,4,7,11],4,1),
-  ArpChord("7",[0,4,7,10],4,1),
-  #////////     20     /////
-  ArpChord("7sus2",[0,2,7,10],4,1),
-  ArpChord("7sus4",[0,5,7,10],4,1),
-  ArpChord("min7",[0,3,7,10],4,1),
-  ArpChord("dim7",[0,3,6,8],4,1),
-  ArpChord("Maj9",[0,4,7,11,14],5,1),
-
-  ArpChord("Maj6/9",[0,4,7,9,14],5,1),
-  ArpChord("Maj#11",[0,4,7,11,14,18],6,2),
-  ArpChord("9",[0,4,7,10,14],5,1),
-  ArpChord("7(b9)",[0,4,7,10,13],5,1),
-  ArpChord("7(b9,b13)",[0,4,7,10,13,20],6,2),
-  #////////     30     /////
-  ArpChord("Ionian",[0,2,4,5,7,9,11],7,1),
-  ArpChord("Dorian",[0,2,3,5,7,9,10],7,1),
-  ArpChord("Phrygian",[0,1,3,5,7,8,10],7,1),
-  ArpChord("Lydian",[0,2,4,6,7,9,11],7,1),
-  ArpChord("Mixolyd.",[0,2,4,5,7,9,10],7,1),
-
-  ArpChord("Aeolian",[0,2,3,5,7,8,10],7,1),
-  ArpChord("Locrian",[0,1,3,5,6,8,10],7,1),
-  ArpChord("Harm Min",[0,2,3,5,7,8,11],7,1),
-  ArpChord("Mel Min",[0,2,3,5,7,9,11],7,1),
-  ArpChord("Penta",[0,2,4,7,9],5,1),
-  #//////////    40 ////////
-  ArpChord("min Penta",[0,3,5,7,10],5,1),
-  ArpChord("Maj Blues",[0,2,3,4,7,9],6,1),
-  ArpChord("min Blues",[0,3,5,6,7,10],6,1),
-  ArpChord("Bebop",[0,2,4,5,7,9,10,11],8,1),
-  ArpChord("WholeTone",[0,2,4,6,8,10],6,1),
-
-  ArpChord("Dim 1 1/2",[0,2,3,5,6,8,9,11],8,1),
-  ArpChord("Dim 1/2 1",[0,2,3,5,6,8,9,11],8,1),
-  ArpChord("Altered",[0,1,3,4,6,8,10],7,1),
-  ArpChord("Chromatic",[0,1,2,3,4,5,6,7,8,9,10,11],12,1),
-  ArpChord("All 4th",[0,5,10,15,20,26,31],7,3),
-  #//////////    50 ////////
-  ArpChord("All 5th",[0,7,14,21,28,35,41],7,4)
-]
-
-def find_chord(chord_desc):
-    chord = None
-    if type(chord_desc) == type(""):
-        for c in arp_chords:
-            if c.chord_name == chord_desc:
-                chord = c
-                break
-    else:
-        chord = arp_chords[chord_desc % len(arp_chords)]
-    if chord is None:
-        raise("chord not found: " + chord_desc)
-    return chord
-
-
-# returns int[16] of midi notes
-def generate_sequence(chord_desc,root=36):
-    chord = find_chord(chord_desc)
-    return chord.generate_sequence(root)
-
-
-MAJOR_KEY_CHORDS = [
-    (find_chord("Maj triad"),0),  #C   I
-    (find_chord("min triad"),2),  #D   ii
-    (find_chord("min triad"),4),  #E   iii
-    (find_chord("Maj triad"),5),  #F   IV
-    (find_chord("Maj triad"),7),  #G   V
-    (find_chord("min triad"),-3),  #A   vi
-    (find_chord("dim triad"),-1)  #B   viio Diminished triad
-]
-MINOR_KEY_CHORDS = [
-    (find_chord("min triad"),0),  #C   i
-    (find_chord("dim triad"),2),  #D   iio Diminished triad
-    (find_chord("aug triad"),4),  #E   III+ Augmented triad
-    (find_chord("min triad"),5),  #F   iv
-    (find_chord("Maj triad"),7),  #G   V
-    (find_chord("Maj triad"),-3),  #A   VI
-    (find_chord("dim triad"),-1)  #B   viio Diminished triad
-]
 
 
 class Carpeggio(AbstractModule):
@@ -153,10 +27,10 @@ class Carpeggio(AbstractModule):
         self.drone_notes = []
 
     def update_chord(self, measure):
-        pair = self.next_chord(measure)
-        self.arp_chord = pair[0]
-        self.chord_offset = pair[1]
-        self.current_sequence = self.arp_chord.generate_sequence(self.root + self.chord_offset)
+        chord = self.next_chord(measure).copy(transpose=self.root)
+        self.arp_chord = chord.chord_shape
+        self.chord_offset = chord.root
+        self.current_sequence = chord.generate_sequence()
 
     def next_step(self, pulse):
         return (self.step + 1) % 16
@@ -243,12 +117,19 @@ def start_of_bar(pulse):
     return pulse.measure and pulse.measure_num % 4 == 0
 
 class CarpeggioGenerative(Carpeggio):
-    def __init__(self, q, clock_sink, cc_sink, notes_out, drone=None, channel=9, ppq=24, minor=False):
+    def __init__(self, q, clock_sink, cc_sink, notes_out, drone=None, root=36, channel=9, ppq=24, minor=False):
         self.last_chord = -1
         self.minor = minor
-        super().__init__(q, clock_sink, cc_sink, notes_out, drone=drone, channel=channel, ppq=ppq)
+        super().__init__(q, clock_sink, cc_sink, notes_out, drone=drone, root=root, channel=channel, ppq=ppq)
         self.seq_prob = 0.05
         self.register = int(random() * 210343859341) & 0xffff
+
+
+
+
+
+
+
         self.register_rotation = 0
 
         # generate random triggers for 32 steps
