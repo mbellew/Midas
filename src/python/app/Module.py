@@ -1,5 +1,6 @@
 from app.MidiMap import MidiMap
 from app.Event import EVENT_CLOCK, EVENT_MIDI, EVENT_STOP
+from app.DisplayArea import DisplayArea
 
 
 class Module:
@@ -9,6 +10,7 @@ class Module:
 
 class AbstractModule(Module):
     def __init__(self):
+        self.display_area = DisplayArea.screen(0,0) # allocate a do-nothing display
         self.ccmap = MidiMap()
         self.time = -1
 

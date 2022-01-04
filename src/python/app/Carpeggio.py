@@ -33,7 +33,7 @@ from app.Chords import *
 
 
 class Carpeggio(AbstractModule):
-    def __init__(self, q, clock_sink, cc_sink, notes_out, channel=9, drone=None, ppq=48, root=36):
+    def __init__(self, q, clock_sink, cc_sink, notes_out, drone_out=None, channel=9, drone=8, ppq=48, root=36):
         super().__init__()
         self.time = -1
         self.root = root
@@ -47,6 +47,7 @@ class Carpeggio(AbstractModule):
         q.createSink(cc_sink,self)
         self.ppq = ppq
         self.notes_out = q.createSource(notes_out)
+        self.drone_out = None if not drone_out else q.createSource(drone_out)
         self.channel = channel
         self.notes_currently_on = []
         self.drone_notes = []
@@ -71,26 +72,26 @@ class Carpeggio(AbstractModule):
             return
 
         # drone
-        if self.drone_channel is not None and pulse.measure:
+        if self.drone_out is not None and pulse.measure:
             if pulse.measure_num % 4 == 0:
                 self.update_chord(pulse.measure)
             if pulse.measure_num % 4 == 0:
                 current_notes_on = self.drone_notes
                 self.drone_notes = []
-                off_on = True
-                if off_on:
+                legato = False
+                if not legato:
                     for off_msg in current_notes_on:
                         off_msg.time = self.time
-                        self.notes_out.add(Event(EVENT_MIDI,'carpeggio.drone',off_msg))
+                        self.drone_out.add(Event(EVENT_MIDI,'carpeggio.drone',off_msg))
                 note = self.current_sequence[0]
                 on_msg = mido.Message('note_on', note=note, channel=self.drone_channel, time=self.time)
                 off_msg = mido.Message('note_off', note=note, channel=self.drone_channel)
                 self.drone_notes.append(off_msg)
-                self.notes_out.add(Event(EVENT_MIDI,'carpeggio.drone',on_msg))
-                if not off_on:
+                self.drone_out.add(Event(EVENT_MIDI,'carpeggio.drone',on_msg))
+                if legato:
                     for off_msg in current_notes_on:
                         off_msg.time = self.time
-                        self.notes_out.add(Event(EVENT_MIDI,'carpeggio.drone',off_msg))
+                        self.drone_out.add(Event(EVENT_MIDI,'carpeggio.drone',off_msg))
                     self.drone_notes = []
 
         # bass motif
@@ -116,12 +117,11 @@ class Carpeggio(AbstractModule):
     def trigger(self, pulse):
         return pulse.beat
 
-
     def handle_stop(self):
         for off_msg in self.notes_currently_on:
             self.notes_out.add(Event(EVENT_MIDI,'carpeggio',off_msg))
         for off_msg in self.drone_notes:
-            self.notes_out.add(Event(EVENT_MIDI,'carpeggio.drone',off_msg))
+            self.drone_out.add(Event(EVENT_MIDI,'carpeggio.drone',off_msg))
         for i in range(0,16):
             note = self.current_sequence[i]
             off_msg = mido.Message('note_off', note=note, channel=self.channel, time=self.time)

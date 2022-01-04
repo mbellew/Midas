@@ -8,6 +8,8 @@ from app.TransposeModule import TransposeModule
 from app.StrumArpeggiator import StrumArpeggiator
 from app.StrumPattern import StrumPattern
 from app.Rhythms import *
+import threading
+from www.MidasServer import MidasServer
 
 # I think this is most common
 PPQ = 24
@@ -21,27 +23,6 @@ def unique_name(s):
     global __unique__
     __unique__ = __unique__ + 1
     return str(s) + str(__unique__)
-
-
-# class TimerStep:
-#     def __init__(self, clock, point):
-#         self.last_pulse = -1
-#         self.clock = clock
-#         self.point = point
-#         self.clock.reset()
-
-#     def process(self):
-#         pulse = self.clock.update()
-#         if pulse == self.last_pulse:
-#             return False
-#         self.point.add_first((EVENT_PULSE,pulse))
-#         if 0 == pulse % 24:
-#             self.point.add_first((EVENT_TEMPO,pulse))
-#         if 0 == pulse % 96:
-#             self.point.add_first((EVENT_MEASURE,pulse))
-#         self.last_pulse = pulse
-#         return True
-
 
 
 class DebugModule:
@@ -104,13 +85,15 @@ class MidiOutModule(AbstractModule):
 
 
 class MidiChannelFilter:
-    def __init__(self,q,in_channel,out_channel=-1,sink_name=None,source_name=None):
+    def __init__(self,q,in_channel=None,out_channel=-1,sink_name=None,source_name=None):
         global patch_point_unique
         if not sink_name:
             sink_name = unique_name("MidiChannelFilter_sink_")
         self.sink = q.createSink(sink_name, self)
         if not source_name:
             source_name = unique_name("MidiChannelFilter_source_")
+        self.sink_name = sink_name
+        self.source_name = source_name
         self.source = q.createSource(source_name)
         self.in_channel = in_channel
         self.out_channel = in_channel if out_channel == -1 else out_channel
@@ -122,11 +105,14 @@ class MidiChannelFilter:
         msg = event.obj
         if msg.type != 'note_on' and msg.type != 'note_off':
             return
-        if not msg.channel or msg.channel != self.in_channel:
+        if not msg.channel:
             return
-        out_msg = msg.copy(channel=self.out_channel)
+        if self.in_channel is not None and msg.channel != self.in_channel:
+            return
+        out_msg = msg
+        if out_msg.channel != self.out_channel:
+            out_msg = out_msg.copy(channel=self.out_channel)
         self.source.add(Event(EVENT_MIDI, event.source+"/"+self.name,out_msg));
-
 
 
 class PassthroughModule:
@@ -147,28 +133,59 @@ class PassthroughModule:
         return
 
 
+# this is not a module, it is a helper that setup up patches
+# TODO keep track of created patches/MidiChannelFilter so the OutputChannel can be modified 
+class OutputChannel:
+    def __init__(self, q, channel):
+        self.q = q
+        self.channel = channel
+        self.target_name = None
+        self.target_midi_channel = channel
+        self.output_source = None
+        self.passthrough = None
+        self.midifilter = None
+        self.sink_name = "CH" + str(channel+1)
+        self.name = self.sink_name
+        q.createSink(self.sink_name)
+
+    def setup(self, device, channel=None, name=None):
+        if channel is not None:
+            self.channel = channel
+        if name:
+            self.name = name
+        self.midifilter = MidiChannelFilter(self.q, None, self.channel, self.sink_name)
+        self.q.createPatch(self.midifilter.source_name, device)        
+
 
 class Application:
 
     def __init__(self):
         global PPQ
+        self.display_area = DisplayArea.screen(25,80)
         self.lastPulse = -1
         self.patchQueue = PatchQueue('queue_clock_in')
+        q = self.patchQueue
         self.steps = []
+        self.output_channels = []
+        for ch in range(0,16):
+            self.output_channels.append(OutputChannel(q,ch))
 
         #
         # Wire up the CLOCK and QUEUE
         #
 
-        q = self.patchQueue
         self.internal_clock = InternalClock(q, 'internal_clock', 90, PPQ)
-        TimeKeeper( self.patchQueue, 'timekeeper_in', 'clock', PPQ)
+        self.timeKeeper = TimeKeeper( self.patchQueue, 'timekeeper_in', 'clock', PPQ)
         self.steps.append( self.patchQueue )
         self.patch('clock', 'queue_clock_in')
 
         self.findMidiInputs()
         self.findMidiOutputs()
         return None
+
+
+    def getOutputChannel(self,ch):
+        return self.output_channels[ch]
 
 
     def process_events(self):
@@ -348,6 +365,9 @@ class Application:
             result = step.process()
             if result: didsomething = True
         if not didsomething:
+            if self.display_area.isDirty():
+                print("\n\n\n")
+                print(self.display_area.toString())
             time.sleep(0.001)
         return
 
@@ -359,7 +379,13 @@ class Application:
     
         self.print_patch()
         self.patchQueue.optimize()
-        while True:
-            self.loop()
-        return
 
+        t = MidasServer().run_in_background()
+
+        try:
+            while True:
+                self.loop()
+        except KeyboardInterrupt:
+            self.timeKeeper.handle(Event(EVENT_MIDI, 'KeyboardInterrupt', mido.Message('stop')))
+            time.sleep(0.001)
+            t.join()

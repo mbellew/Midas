@@ -1,6 +1,6 @@
 from app.StrumPattern import StrumPattern
 from app.Application import *
-from app.Rhythms import RhythmModule, MpcDrumKit, Spark, VolcaBeats, MOTORIK3
+from app.Rhythms import RhythmModule, MpcDrumKit, MpcPadsChromaticMidi0, Spark, VolcaBeats, MOTORIK3
 from app.Carpeggio import Carpeggio, CarpeggioRand, CarpeggioGenerative
 
 app = Application()
@@ -12,7 +12,8 @@ q = app.patchQueue
 
 StrumPattern(q, 'strumpattern_in', 'strumpattern_out')
 DebugModule(q, 'debug')
-RhythmModule(q, "rhythm_clock_in", "rhythm_cc_in", "rhythm_out", drumkit=Spark(60), channel=CH10, ppq=PPQ)
+m = RhythmModule(q, "rhythm_clock_in", "rhythm_cc_in", "rhythm_out", drumkit=MpcPadsChromaticMidi0(8), channel=CH10, ppq=PPQ)
+m.instrument = [0,2,3,5]
 CarpeggioGenerative(q, "carpeggio_clock_in", "carpeggio_cc_in", "carpeggio_out", channel=CH9, drone=CH8, ppq=PPQ, minor=False)
 
 # 

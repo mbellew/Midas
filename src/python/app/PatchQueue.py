@@ -1,5 +1,5 @@
 from app.DelayQueue import DelayQueue
-from app.Event import EVENT_CLOCK
+from app.Event import EVENT_CLOCK, Event
 from threading import RLock
 
 
@@ -53,7 +53,7 @@ class PatchQueue:
             self.queue.set_time(event.obj.time)
 
 
-    def createSink(self, sink, handler):
+    def createSink(self, sink, handler=None):
         return self.createPoint(sink, SINK_POINT, handler)
 
 
@@ -137,8 +137,8 @@ class PatchQueue:
 
 
     def add(self, event, point):
-        if type(event) == type((1,2,3)):
-            return
+        if type(event) != Event:
+            raise "BAD"
         if not point:
             return
         if self.stringType == type(point):
