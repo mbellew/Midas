@@ -17,6 +17,10 @@ PPQ = 24
 # channels are 0 based which is confusing, here are some constants
 (CH1,CH2,CH3,CH4,CH5,CH6,CH7,CH8,CH9,CH10,CH11,CH12,CH13,CH14,CH15,CH16) = range(0,16)
 
+BEATSTEP_CONTROLLER = "BEATSTEP"
+TWISTER_CONTROLLER = "TWISTER"
+
+
 __unique__ = 100
 
 def unique_name(s):
@@ -186,6 +190,14 @@ class Application:
 
     def getOutputChannel(self,ch):
         return self.output_channels[ch]
+
+
+    def addProgram(self,module):
+        pass
+
+
+    def addProgramController(self, source, type=BEATSTEP_CONTROLLER):
+        pass
 
 
     def process_events(self):
@@ -380,12 +392,12 @@ class Application:
         self.print_patch()
         self.patchQueue.optimize()
 
-        t = MidasServer().run_in_background()
+        webserver = MidasServer().run_in_background()
 
         try:
             while True:
                 self.loop()
         except KeyboardInterrupt:
             self.timeKeeper.handle(Event(EVENT_MIDI, 'KeyboardInterrupt', mido.Message('stop')))
-            time.sleep(0.001)
-            t.join()
+            webserver.stop()
+            

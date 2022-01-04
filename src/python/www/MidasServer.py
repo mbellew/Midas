@@ -22,13 +22,18 @@ class MidasServer:
         self.hostName = hostName
         self.serverPort = serverPort
         self.webServer = HTTPServer((hostName, serverPort), _MidasServlet)
-
+        self.thread = None
 
     def run_in_background(self):
-        t = threading.Thread(target=lambda : self.run())
-        t.start()
-        return t
+        if not self.thread:
+            self.thread = threading.Thread(target=lambda : self.run())
+            self.thread.start()
+        return self
 
+    def stop(self):
+        if self.thread:
+            self.webServer.shutdown()
+            self.thread.join()
 
     def run(self):
         print("Starting server http://%s:%s" % (self.hostName, self.serverPort))
