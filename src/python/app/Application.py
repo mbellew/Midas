@@ -249,7 +249,7 @@ class Application:
         if not module.isProgramModule():
             raise Exception("bad config")
         i = len(self.programs)
-        module.set_display_area(self.screen.subArea(i*8+1, 8, 7, 40))
+        module.set_display_area(self.screen.subArea(i*8+2, 8, 7, 40))
         module.update_display()
         self.programs.append(module)
         pass
