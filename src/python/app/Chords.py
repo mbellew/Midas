@@ -23,6 +23,7 @@
 // SOFTWARE.
 """
 
+
 class ChordShape:
     def __init__(self, name, tones, octave_span=1):
         self.chord_name = name
@@ -62,7 +63,7 @@ class Chord:
 
 
 CHORD_SHAPES = [
-  #ARPEGGIATE
+  # ARPEGGIATE
   ChordShape("Maj triad",[0, 4, 7]),
   ChordShape("Maj inv 1",[4, 7, 12]),
   ChordShape("Maj inv 2",[7, 12, 16]),
@@ -90,7 +91,7 @@ CHORD_SHAPES = [
   ChordShape("min6",[0,3,7,9]),
   ChordShape("Maj7",[0,4,7,11]),
   ChordShape("7",[0,4,7,10]),
-  #////////     20     /////
+  # ////////     20     /////
   ChordShape("7sus2",[0,2,7,10]),
   ChordShape("7sus4",[0,5,7,10]),
   ChordShape("min7",[0,3,7,10]),
@@ -102,7 +103,7 @@ CHORD_SHAPES = [
   ChordShape("9",[0,4,7,10,14]),
   ChordShape("7(b9)",[0,4,7,10,13]),
   ChordShape("7(b9,b13)",[0,4,7,10,13,20],2),
-  #////////     30     /////
+  # ////////     30     /////
   ChordShape("Ionian",[0,2,4,5,7,9,11]),
   ChordShape("Dorian",[0,2,3,5,7,9,10]),
   ChordShape("Phrygian",[0,1,3,5,7,8,10]),
@@ -114,7 +115,7 @@ CHORD_SHAPES = [
   ChordShape("Harm Min",[0,2,3,5,7,8,11]),
   ChordShape("Mel Min",[0,2,3,5,7,9,11]),
   ChordShape("Penta",[0,2,4,7,9]),
-  #//////////    40 ////////
+  # //////////    40 ////////
   ChordShape("min Penta",[0,3,5,7,10]),
   ChordShape("Maj Blues",[0,2,3,4,7,9]),
   ChordShape("min Blues",[0,3,5,6,7,10]),
@@ -126,7 +127,7 @@ CHORD_SHAPES = [
   ChordShape("Altered",[0,1,3,4,6,8,10]),
   ChordShape("Chromatic",[0,1,2,3,4,5,6,7,8,9,10,11]),
   ChordShape("All 4th",[0,5,10,15,20,26,31],3),
-  #//////////    50 ////////
+  # //////////    50 ////////
   ChordShape("All 5th",[0,7,14,21,28,35,41],4)
 ]
 CHORD_MAP = {}
@@ -152,20 +153,20 @@ def find_chord(chord_desc):
 
 
 MAJOR_KEY_CHORDS = [
-    Chord(find_chord("Maj triad"),0),  #C   I
-    Chord(find_chord("min triad"),2),  #D   ii
-    Chord(find_chord("min triad"),4),  #E   iii
-    Chord(find_chord("Maj triad"),5),  #F   IV
-    Chord(find_chord("Maj triad"),7),  #G   V
-    Chord(find_chord("min triad"),-3),  #A   vi
-    Chord(find_chord("dim triad"),-1)  #B   viio Diminished triad
+    Chord(find_chord("Maj triad"),0),  # C   I
+    Chord(find_chord("min triad"),2),  # D   ii
+    Chord(find_chord("min triad"),4),  # E   iii
+    Chord(find_chord("Maj triad"),5),  # F   IV
+    Chord(find_chord("Maj triad"),7),  # G   V
+    Chord(find_chord("min triad"),-3), # A   vi
+    Chord(find_chord("dim triad"),-1)  # B   viio Diminished triad
 ]
 MINOR_KEY_CHORDS = [
-    Chord(find_chord("min triad"),0),  #C   i
-    Chord(find_chord("dim triad"),2),  #D   iio Diminished triad
-    Chord(find_chord("aug triad"),4),  #E   III+ Augmented triad
-    Chord(find_chord("min triad"),5),  #F   iv
-    Chord(find_chord("Maj triad"),7),  #G   V
-    Chord(find_chord("Maj triad"),-3),  #A   VI
-    Chord(find_chord("dim triad"),-1)  #B   viio Diminished triad
+    Chord(find_chord("min triad"),0),  # C   i
+    Chord(find_chord("dim triad"),2),  # D   iio Diminished triad
+    Chord(find_chord("aug triad"),4),  # E   III+ Augmented triad
+    Chord(find_chord("min triad"),5),  # F   iv
+    Chord(find_chord("Maj triad"),7),  # G   V
+    Chord(find_chord("Maj triad"),-3), # A   VI
+    Chord(find_chord("dim triad"),-1)  # B   viio Diminished triad
 ]

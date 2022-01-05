@@ -11,8 +11,9 @@ class DisplayArea:
             for r in range(0,height):
                 self.data.append(" " * width)
 
-    def screen(height,width):
-        return DisplayArea(None,0,0,height,width)
+    @staticmethod
+    def screen(height, width):
+        return DisplayArea(None, 0, 0, height, width)
 
     def toString(self):
         ret = "\n".join(self.data)

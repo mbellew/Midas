@@ -1,5 +1,4 @@
-from typing import SupportsRound
-from app.Event import Event, EVENT_MIDI, EVENT_CONTINUE, EVENT_DONE
+from app.Event import Event, EVENT_MIDI
 
 
 class TransposeModule:
@@ -15,7 +14,7 @@ class TransposeModule:
 
     def handle(self, event):
         if EVENT_MIDI != event.code:
-            return EVENT_CONTINUE
+            return
         source = event.source
         msg = event.obj
         if msg.type == 'control_change':

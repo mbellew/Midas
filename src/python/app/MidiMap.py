@@ -7,6 +7,6 @@ class MidiMap:
             self.map.append(None)
         self.map[cc] = lamb
     
-    def dispatch(self,msg):
+    def dispatch(self, msg):
         if msg.control < len(self.map) and self.map[msg.control]:
-             self.map[msg.control](msg)
+            self.map[msg.control](msg)

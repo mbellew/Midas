@@ -1,7 +1,7 @@
-from app.StrumPattern import StrumPattern
 from app.Application import *
-from app.Rhythms import RhythmModule, MpcDrumKit, MpcPadsChromaticMidi0, Spark, VolcaBeats, MOTORIK3
+from app.Application import *
 from app.Carpeggio import CarpeggioGenerative
+from app.Rhythms import RhythmModule, VolcaBeats
 
 app = Application()
 q = app.patchQueue
@@ -43,16 +43,16 @@ drumOut = app.setupOutputChannel(CH10, 'mio_sink', name="DRUMS")
 #
 
 # sequencer needs clock, and supports control_change messages
-app.patch('clock','rhythm_clock_in')
+app.patch('clock', 'rhythm_clock_in')
 app.patch('rhythm_out', drumOut)
 
 # sequencer needs clock, and supports control_change messages
-app.patch('clock','carpeggio_clock_in')
+app.patch('clock', 'carpeggio_clock_in')
 app.patch('carpeggio_out', arpOut)
 app.patch('carpeggio_drone', droneOut)   
 
 #app.patch('keyboard','mio_sink')
-#app.patch('Arturia BeatStep_in','debug')
+app.patch('Arturia BeatStep_in','debug')
 #app.patch('knobs','debug')
 
 app.main()

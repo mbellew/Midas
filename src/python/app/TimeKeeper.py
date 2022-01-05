@@ -15,7 +15,7 @@ class InternalClock:
         self.reset()
         self.update_bpm(bpm)
         self.ccmap = MidiMap()
-        self.ccmap.add( 15, lambda m : self.cc_bpm(m))
+        self.ccmap.add(15, lambda m : self.cc_bpm(m))
 
 
     def update_bpm(self, bpm):

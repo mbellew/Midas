@@ -1,15 +1,11 @@
 import datetime
 import time
-import mido
-from app.Event import *
+
+from app.DisplayArea import DisplayArea
+from app.Module import AbstractModule
 from app.PatchQueue import PatchQueue, SINK_POINT, SOURCE_POINT
-from app.TimeKeeper import TimeKeeper, InternalClock
-from app.TransposeModule import TransposeModule
-from app.StrumArpeggiator import StrumArpeggiator
-from app.StrumPattern import StrumPattern
 from app.Rhythms import *
-import threading
-from www.MidasServer import MidasServer
+from app.TimeKeeper import TimeKeeper, InternalClock
 
 # I think this is most common
 PPQ = 24
@@ -77,6 +73,7 @@ class MidiInputStep:
 
 class MidiOutModule(AbstractModule):
     def __init__(self, q, sink, port):
+        super().__init__()
         q.createSink(sink, self)
         self.port = port
 
@@ -116,7 +113,7 @@ class MidiChannelFilter:
         out_msg = msg
         if out_msg.channel != self.out_channel:
             out_msg = out_msg.copy(channel=self.out_channel)
-        self.source.add(Event(EVENT_MIDI, event.source+"/"+self.name,out_msg));
+        self.source.add(Event(EVENT_MIDI, event.source+"/"+self.name, out_msg))
 
 
 class PassthroughModule:
@@ -174,17 +171,25 @@ class ProgramController:
         msg = event.obj
         program_change = None
 
-        if msg.type == 'control_change' and msg.control >= 127:
-            self.shifted = msg.value==127
+        if msg.type == 'control_change' and msg.channel == CH16:
+            # can't seem to change msg.control on BEATSTEP/STOP (always 1), but I can set channel to CH16
+            if msg.control == 1 or msg.control == 127:
+                self.shifted = msg.value == 127
             return
+
+        pad = None
+        # ASSUME PADS ARE channel2 0-15 or any channel 16-31
+        if msg.type == 'control_change' and (
+                (msg.channel == CH2 and 0 <= msg.control < 16) or
+                (16 <= msg.control < 32)):
+            pad = msg.control % 16
 
         if msg.type == 'program_change':
             program_change = msg.program
-        # ASSUME PADS ARE channel2 0-15 or any channel 16-31    
-        elif self.shifted and msg.type == 'control_change' and (msg.channel==2 or msg.control >= 16):
-            ch = msg.control % 16
-            if ch < 15:
-                program_change = ch
+        # ASSUME PADS ARE channel2 0-15 or any channel 16-31
+        elif self.shifted and pad is not None:
+            program_change = pad
+        # "level" wheel on beatstep
         elif msg.type == 'control_change' and msg.control == 100 and (msg.value==1 or msg.value == 127):
             if msg.value == 127:
                 program_change = self.app.current_program + len(self.app.programs) - 1
@@ -205,7 +210,7 @@ class Application:
 
     def __init__(self):
         global PPQ
-        self.screen = DisplayArea.screen(25,80)
+        self.screen = DisplayArea.screen(25, 80)
         self.screen.dirty = True
         self.lastPulse = -1
         self.patchQueue = PatchQueue('queue_clock_in')
@@ -235,7 +240,7 @@ class Application:
         return None
 
 
-    def getOutputChannel(self,ch):
+    def getOutputChannel(self, ch):
         return self.output_channels[ch]
 
 
@@ -332,7 +337,7 @@ class Application:
                 if name.startswith(device):
                     device = name
                     break
-        elif type(device) == type(1):
+        elif type(device) == int:
             device = mido.get_input_names()[device]
         port = mido.open_output(device)
         return MidiOutModule(port)
@@ -488,7 +493,7 @@ class Application:
         self.print_patch()
         self.patchQueue.optimize()
 
-        webserver = None #MidasServer().run_in_background()
+        webserver = None  # MidasServer().run_in_background()
 
         try:
             while True:
@@ -497,4 +502,3 @@ class Application:
             self.timeKeeper.handle(Event(EVENT_MIDI, 'KeyboardInterrupt', mido.Message('stop')))
             if webserver:
                 webserver.stop()
-            

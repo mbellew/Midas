@@ -1,10 +1,9 @@
 from app.DelayQueue import DelayQueue
-from app.Event import EVENT_CLOCK, Event
-from threading import RLock
-
+from app.Event import EVENT_CLOCK
 
 # we want to act more or less single threaded, dispatchEvent is a good choke-point
-#_THREAD_LOCK_ = RLock()
+# from threading import RLock
+# _THREAD_LOCK_ = RLock()
 _THREAD_LOCK_ = None
 
 SINK_POINT = 100
@@ -62,7 +61,7 @@ class PatchQueue:
 
 
     def createPoint(self, sink, inout, handler=None):
-        if type(sink)==self.stringType:
+        if type(sink) == self.stringType:
             name = sink            
             if not name in self.points:
                 point = Point(self, name, inout, handler)
@@ -137,20 +136,16 @@ class PatchQueue:
 
 
     def add(self, event, point):
-        if type(event) != Event:
-            raise "BAD"
         if not point:
             return
         if self.stringType == type(point):
             point = self.createPoint(point)
-        if 0==0:
-            self.dispatchEvent(event, point)
-            return
-        patchevent = PatchQueueEvent(event, point)
-        self.queue.add(patchevent)
+        self.dispatchEvent(event, point)
+        # patchevent = PatchQueueEvent(event, point)
+        # self.queue.add(patchevent)
 
 
-    def add_first(self, event, point = None):
+    def add_first(self, event, point=None):
         if type(event) == type((1,2,3)):
             return
         if not point:

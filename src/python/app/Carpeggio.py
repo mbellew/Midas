@@ -23,13 +23,13 @@
 // SOFTWARE.
 """
 
-import mido
 from random import random, randrange
-from app.MidiMap import MidiMap
-from app.Event import Event, EVENT_CLOCK, EVENT_MIDI, EVENT_STOP
-from app.Module import AbstractModule, ProgramModule
-from app.Chords import *
 
+import mido
+
+from app.Chords import *
+from app.Event import Event, EVENT_MIDI
+from app.Module import ProgramModule
 
 
 class Carpeggio(ProgramModule):
@@ -40,11 +40,14 @@ class Carpeggio(ProgramModule):
         self.drone_channel = drone
         self.note_prob = 0.92
 
+        self.arp_chord = None
+        self.chord_offset = None
+        self.current_sequence = None
         self.update_chord(0)
         self.step = -1
 
-        q.createSink(clock_sink,self)
-        self.cc_sink = q.createSink(cc_sink,self)
+        q.createSink(clock_sink, self)
+        self.cc_sink = q.createSink(cc_sink, self)
         self.ppq = ppq
         self.notes_out = q.createSource(notes_out)
         self.drone_out = None if not drone_out else q.createSource(drone_out)
@@ -53,7 +56,7 @@ class Carpeggio(ProgramModule):
         self.drone_notes = []
 
     def update_display(self):
-        self.display_area.write(0,0,"root note " + str(self.root))
+        self.display_area.write(0, 0, "root note " + str(self.root))
 
     def get_control_sink(self):
         return self.cc_sink
@@ -67,7 +70,7 @@ class Carpeggio(ProgramModule):
     def next_step(self, pulse):
         return (self.step + 1) % 16
 
-    def next_chord(measure):
+    def next_chord(self, measure):
         return MAJOR_KEY_CHORDS[randrange(len(MAJOR_KEY_CHORDS))]
 
     def handle_clock(self, pulse):
@@ -189,7 +192,7 @@ class CarpeggioGenerative(Carpeggio):
             self.register = rotate_word_right(self.register, 16-self.register_rotation)
             self.register_rotation = 0
 
-        #print(hex(self.state))
+        # print(hex(self.state))
         curr = self.register
         self.register = rotate_word_right(self.register, 5)
         self.register_rotation = self.register_rotation + 5
@@ -200,8 +203,8 @@ class CarpeggioGenerative(Carpeggio):
 
     def next_chord(self, measure):
         r = random()
-        if measure==0:
-            c=0
+        if measure == 0:
+            c = 0
         elif r < 0.2:
             c = 0       # I
         elif r < 0.4:
@@ -218,7 +221,7 @@ class CarpeggioGenerative(Carpeggio):
             c = 6       #VII
         if c == self.last_chord:
             c = randrange(0,7)
-        #print("CHORD " + str(c+1))
+        # print("CHORD " + str(c+1))
         if self.minor:
             return MINOR_KEY_CHORDS[c]
         else:

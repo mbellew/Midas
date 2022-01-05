@@ -1,11 +1,9 @@
-from app.Event import * 
-from app.Module import AbstractModule
-import mido
 import random
-from app.MidiMap import MidiMap
-from app.Module import ProgramModule
-from app.DisplayArea import DisplayArea
 
+import mido
+
+from app.Event import *
+from app.Module import ProgramModule
 
 Rhythm_array = []
  
@@ -36,9 +34,11 @@ class Rhythm:
             raise Exception("BAD")
         Rhythm_array.append(self)
 
+    @staticmethod
     def count():
         return len(Rhythm_array)
 
+    @staticmethod
     def get(i):
         return Rhythm_array[i]
 

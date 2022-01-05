@@ -4,6 +4,14 @@
     // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
     "version": "0.2.0",
     "configurations": [
+
+        {
+            "name": "Python: KorgConcert.py",
+            "type": "python",
+            "request": "launch",
+            "program": "/Users/matthewb/Midas/src/python/KorgConcert.py",
+            "console": "integratedTerminal"
+        },
         {
             "name": "Python: Current File",
             "type": "python",
@@ -11,5 +19,6 @@
             "program": "${file}",
             "console": "integratedTerminal"
         }
+
     ]
 }

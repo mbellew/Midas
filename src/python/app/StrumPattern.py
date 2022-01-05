@@ -1,8 +1,5 @@
 import mido
-from app.Event import Event, EVENT_MIDI, EVENT_CONTINUE, EVENT_DONE, EVENT_CLOCK
-from app.PatchQueue import SINK_POINT
-
-#from math import max, min
+from app.Event import Event, EVENT_MIDI, EVENT_CLOCK
 
 
 class StrumPattern:
