@@ -3,7 +3,7 @@ from app.Module import AbstractModule
 import mido
 import random
 from app.MidiMap import MidiMap
-from app.Module import AbstractModule
+from app.Module import ProgramModule
 from app.DisplayArea import DisplayArea
 
 
@@ -254,8 +254,8 @@ class Player:
         for i in range(0,4):
             off = self.offsets[i] % self.rhythm.count
             pattern = self.rhythm.parts[i]
-            s = pattern[off:] + pattern[0:off] + "  " + str(int(round(self.probability[i]*100))) + "%"
-            area.write(i,0,s)
+            area.write(i,0,pattern[off:] + pattern[0:off])
+            area.right(i,len(pattern)+1,str(int(self.probability[i]*100))+'%',pad=4)
 
 
 # This is really just a note remapping helper that deals with Drum kits, since they all have different mappings
@@ -411,11 +411,11 @@ class Spark(NotesDrumKit):
         super().__init__(range(root,root+16))
 
 
-class RhythmModule(AbstractModule):
+class RhythmModule(ProgramModule):
     def __init__(self, q, clock_sink, cc_sink, notes_out, rhythm=POP1, drumkit=None, channel=9, ppq=48):
-        super().__init__()
+        super().__init__("Rhythms")
         q.createSink(clock_sink,self)
-        q.createSink(cc_sink,self)
+        self.cc_sink = q.createSink(cc_sink,self)
         self.ppq = ppq
         self.notes_out = q.createSource(notes_out)
 
@@ -439,20 +439,27 @@ class RhythmModule(AbstractModule):
         self.ccmap.add(10, lambda m : self.cc_instrument(m,2))
         self.ccmap.add(14, lambda m : self.cc_instrument(m,3))
 
+    def get_control_sink(self):
+        return self.cc_sink
+
+    def get_display_name(self):
+        return self.name + " " + self.player.rhythm.name
+
     def update_display(self):
-        self.display_area.write(0,0,self.player.rhythm.name)
-        self.player.update_display(self.display_area.subArea(1,0,4,40))
+        for i in range(0,4):
+            self.display_area.right(i,0,str(self.instrument[i]),pad=2)
+        self.player.update_display(self.display_area.subArea(0,3,4,40))
 
     def cc_rhythm(self, msg):
         r = int((msg.value/128.0) * Rhythm.count())
         rhythm = Rhythm.get(r)
         if  self.player.rhythm != rhythm:
             self.player.rhythm = rhythm
-            self.display_area.write(0,0,rhythm.name)
+            self.update_display()
 
     def cc_offset(self, msg, ch):
         count = self.player.rhythm.count
-        offset = int((msg.value/128.0) * count)
+        offset = int((1.0-msg.value/128.0) * count)
         if self.player.offsets[ch] != offset:
             self.player.offsets[ch] = offset
             self.update_display()
@@ -465,8 +472,10 @@ class RhythmModule(AbstractModule):
     def cc_instrument(self, msg, ch):
         count = self.drumkit.count()
         i = int((msg.value/128.0) * count)
-        self.instrument[ch] = i
-        print(self.instrument)
+        if self.instrument[ch] != i:
+            self.instrument[ch] = i
+            self.update_display()
+            #print(self.instrument)
 
     def handle_clock(self, pulse):
         if not pulse.eighth:

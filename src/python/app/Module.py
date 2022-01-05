@@ -41,3 +41,28 @@ class AbstractModule(Module):
 
     def handle_note(self,msg):
         return
+
+
+class ProgramModule(AbstractModule):
+    def __init__(self, name):
+        super().__init__()
+        self.name = name
+        self.display_area = DisplayArea.screen(0,0)
+
+    def set_display_area(self, d):
+        self.display_area = d
+
+    def update_display(self):
+        raise Exception("please implement this")
+
+    def get_display_name(self):
+        return self.name
+        
+    def isProgramModule(self):
+        return True
+
+    def get_control_sink(type):
+        raise Exception("please implement this")
+
+
+    

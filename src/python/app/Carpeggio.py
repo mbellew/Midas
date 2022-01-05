@@ -27,14 +27,14 @@ import mido
 from random import random, randrange
 from app.MidiMap import MidiMap
 from app.Event import Event, EVENT_CLOCK, EVENT_MIDI, EVENT_STOP
-from app.Module import AbstractModule
+from app.Module import AbstractModule, ProgramModule
 from app.Chords import *
 
 
 
-class Carpeggio(AbstractModule):
+class Carpeggio(ProgramModule):
     def __init__(self, q, clock_sink, cc_sink, notes_out, drone_out=None, channel=9, drone=8, ppq=48, root=36):
-        super().__init__()
+        super().__init__("Carpeggio")
         self.time = -1
         self.root = root
         self.drone_channel = drone
@@ -44,13 +44,19 @@ class Carpeggio(AbstractModule):
         self.step = -1
 
         q.createSink(clock_sink,self)
-        q.createSink(cc_sink,self)
+        self.cc_sink = q.createSink(cc_sink,self)
         self.ppq = ppq
         self.notes_out = q.createSource(notes_out)
         self.drone_out = None if not drone_out else q.createSource(drone_out)
         self.channel = channel
         self.notes_currently_on = []
         self.drone_notes = []
+
+    def update_display(self):
+        self.display_area.write(0,0,"root note " + str(self.root))
+
+    def get_control_sink(self):
+        return self.cc_sink
 
     def update_chord(self, measure):
         chord = self.next_chord(measure).copy(transpose=self.root)
@@ -141,11 +147,12 @@ def rotate_word_right(w, n):
 def start_of_bar(pulse):
     return pulse.measure and pulse.measure_num % 4 == 0
 
+
 class CarpeggioGenerative(Carpeggio):
-    def __init__(self, q, clock_sink, cc_sink, notes_out, drone=None, root=36, channel=9, ppq=24, minor=False):
+    def __init__(self, q, clock_sink, cc_sink, notes_out, drone_out=None, root=36, channel=9, ppq=24, minor=False):
         self.last_chord = -1
         self.minor = minor
-        super().__init__(q, clock_sink, cc_sink, notes_out, drone=drone, root=root, channel=channel, ppq=ppq)
+        super().__init__(q, clock_sink, cc_sink, notes_out, drone_out, root=root, channel=channel, ppq=ppq)
         self.seq_prob = 0.05
         self.register = int(random() * 210343859341) & 0xffff
         self.register_rotation = 0
@@ -159,6 +166,12 @@ class CarpeggioGenerative(Carpeggio):
             r = r + randrange(4,6)
         self.trigger_step = 0
         self.eighths = int(ppq/2)
+
+    def update_display(self):
+        self.display_area.write(0,0,"root note " + str(self.root))
+        self.display_area.write(1,0,"minor" if self.minor else "major")
+        c = self.chord_offset - self.root
+        self.display_area.write(2,0,str(c))
 
     def trigger(self, pulse):
         if not pulse.eighth:
@@ -205,7 +218,7 @@ class CarpeggioGenerative(Carpeggio):
             c = 6       #VII
         if c == self.last_chord:
             c = randrange(0,7)
-        print("CHORD " + str(c+1))
+        #print("CHORD " + str(c+1))
         if self.minor:
             return MINOR_KEY_CHORDS[c]
         else:

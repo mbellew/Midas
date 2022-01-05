@@ -22,11 +22,23 @@ class DisplayArea:
     def isDirty(self):
         return self.dirty
 
-    def write(self,row,col,replace):
+    def right(self,row,col,replace,pad=3):
+        l = len(replace)
+        if l < pad:
+            replace = (' ' * (pad-l)) + replace
+        elif l > pad:
+            replace = replace[l-pad:]
+        self.write(row,col,replace,False)
+
+    def write(self,row,col,replace,eol=True):
         if row >= self.height or col >= self.width:
             return
-        if len(replace) > self.width-col:
-            replace = replace[0:self.width-col]
+        l = len(replace)
+        avail = self.width-col
+        if l > avail:
+            replace = replace[0:avail]
+        elif eol and l < avail:
+            replace = replace + (' ' * (avail-l))
         if self.screen:
             self.screen._write(self.row+row, self.col+col, replace)
         else:
@@ -34,7 +46,7 @@ class DisplayArea:
 
     def _write(self, row, col, replace):
         s = self.data[row]
-        if s[col:len(replace)] != replace:
+        if s[col:col+len(replace)] != replace:
             self.data[row] = s[0:col] + replace + s[col+len(replace):]
             self.dirty = True
 

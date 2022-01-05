@@ -161,11 +161,52 @@ class OutputChannel:
         self.q.createPatch(self.midifilter.source_name, device)        
 
 
+class ProgramController:
+    def __init__(self, app):
+        self.app = app
+        self.shifted = False
+
+    def handle(self, event):
+        if len(self.app.programs)==0:
+            return
+        if event.code != EVENT_MIDI:
+            return
+        msg = event.obj
+        program_change = None
+
+        if msg.type == 'control_change' and msg.control >= 127:
+            self.shifted = msg.value==127
+            return
+
+        if msg.type == 'program_change':
+            program_change = msg.program
+        # ASSUME PADS ARE channel2 0-15 or any channel 16-31    
+        elif self.shifted and msg.type == 'control_change' and (msg.channel==2 or msg.control >= 16):
+            ch = msg.control % 16
+            if ch < 15:
+                program_change = ch
+        elif msg.type == 'control_change' and msg.control == 100 and (msg.value==1 or msg.value == 127):
+            if msg.value == 127:
+                program_change = self.app.current_program + len(self.app.programs) - 1
+            else:
+                program_change = self.app.current_program + 1
+            program_change = program_change % len(self.app.programs)
+        if program_change is not None and program_change < len(self.app.programs):
+            if self.app.current_program != program_change:
+                self.app.current_program = program_change
+                self.app.repaint = True
+        elif msg.type == 'control_change':
+            if self.app.current_program >= 0 and self.app.current_program < len(self.app.programs):
+                self.app.programs[self.app.current_program].get_control_sink().add(event)
+        return
+
+
 class Application:
 
     def __init__(self):
         global PPQ
-        self.display_area = DisplayArea.screen(25,80)
+        self.screen = DisplayArea.screen(25,80)
+        self.screen.dirty = True
         self.lastPulse = -1
         self.patchQueue = PatchQueue('queue_clock_in')
         q = self.patchQueue
@@ -173,6 +214,12 @@ class Application:
         self.output_channels = []
         for ch in range(0,16):
             self.output_channels.append(OutputChannel(q,ch))
+
+        # for controller patching and UI rendering
+        self.programs = []
+        self.current_program = 0
+        self.controller_sink = self.sink("controller_sink", ProgramController(self))
+        self.repaint = True
 
         #
         # Wire up the CLOCK and QUEUE
@@ -192,13 +239,44 @@ class Application:
         return self.output_channels[ch]
 
 
+    def setupOutputChannel(self, ch, device, channel=None, name=None):
+        self.output_channels[ch].setup(device, channel, name)
+        return self.output_channels[ch].sink_name
+
+
     def addProgram(self,module):
+        # fail fast, see if this is a program module
+        if not module.isProgramModule():
+            raise Exception("bad config")
+        i = len(self.programs)
+        module.set_display_area(self.screen.subArea(i*8+1, 8, 7, 40))
+        module.update_display()
+        self.programs.append(module)
         pass
 
 
+    def update_display(self,repaint=False):
+        if self.repaint:
+            for i in range(0,len(self.programs)):
+                self.screen.right(i*8,1,str(i),pad=2)
+                self.screen.write(i*8,4,self.programs[i].get_display_name())
+                if i==self.current_program:
+                    for r in range(i*8,i*8+7):
+                        self.screen.write(r,0,'|',eol=False)
+                else:
+                    for r in range(i*8,i*8+7):
+                        self.screen.write(r,0,' ',eol=False)
+        if not repaint and not self.screen.isDirty():
+            return
+        s = self.screen.toString()
+        print("\n\n\n\n\n\n\n\n------------------------")
+        print(s)
+        print("------------------------")
+
+
+    # TODO need mappers for different controllers
     def addProgramController(self, source, type=BEATSTEP_CONTROLLER):
-        pass
-
+        self.patch(source,self.controller_sink)
 
     def process_events(self):
         while self.patchQueue.process():
@@ -238,7 +316,6 @@ class Application:
             device = mido.get_input_names()[device]
         port = mido.open_output(device)
         return MidiOutModule(port)
-
 
 
     def findMidiInputs(self):
@@ -377,9 +454,7 @@ class Application:
             result = step.process()
             if result: didsomething = True
         if not didsomething:
-            if self.display_area.isDirty():
-                print("\n\n\n")
-                print(self.display_area.toString())
+            self.update_display()
             time.sleep(0.001)
         return
 
@@ -392,12 +467,13 @@ class Application:
         self.print_patch()
         self.patchQueue.optimize()
 
-        webserver = MidasServer().run_in_background()
+        webserver = None #MidasServer().run_in_background()
 
         try:
             while True:
                 self.loop()
         except KeyboardInterrupt:
             self.timeKeeper.handle(Event(EVENT_MIDI, 'KeyboardInterrupt', mido.Message('stop')))
-            webserver.stop()
+            if webserver:
+                webserver.stop()
             
