@@ -225,7 +225,7 @@ class Application:
         # Wire up the CLOCK and QUEUE
         #
 
-        self.internal_clock = InternalClock(q, 'internal_clock', 90, PPQ)
+        self.internal_clock = None
         self.timeKeeper = TimeKeeper( self.patchQueue, 'timekeeper_in', 'clock', PPQ)
         self.steps.append( self.patchQueue )
         self.patch('clock', 'queue_clock_in')
@@ -254,19 +254,32 @@ class Application:
         self.programs.append(module)
         pass
 
+    
+    def useInternalClock(self, bpm=90):
+        self.internal_clock = InternalClock(q, 'internal_clock', bpm, PPQ)
+        self.patch('internal_clock','timekeeper_in')
+        self.patch('knobs','internal_clock_cc')
+
+
+    def useExternalClock(self, source):
+        self.patch('internal_clock','timekeeper_in')
+        self.patch(source,'timekeeper_in')
+
 
     def update_display(self,repaint=False):
-        if self.repaint:
-            for i in range(0,len(self.programs)):
-                self.screen.right(i*8,1,str(i),pad=2)
-                self.screen.write(i*8,4,self.programs[i].get_display_name())
-                if i==self.current_program:
-                    for r in range(i*8,i*8+7):
-                        self.screen.write(r,0,'|',eol=False)
-                else:
-                    for r in range(i*8,i*8+7):
-                        self.screen.write(r,0,' ',eol=False)
-        if not repaint and not self.screen.isDirty():
+        for i in range(0,len(self.programs)):
+            self.screen.right(i*8,1,str(i),pad=2)
+            self.screen.write(i*8,4,self.programs[i].get_display_name())
+            if i==self.current_program:
+                for r in range(i*8,i*8+7):
+                    self.screen.write(r,0,'|',eol=False)
+            else:
+                for r in range(i*8,i*8+7):
+                    self.screen.write(r,0,' ',eol=False)
+
+
+    def render_display(self, force=False):
+        if not force and not self.screen.isDirty():
             return
         s = self.screen.toString()
         print("\n\n\n\n\n\n\n\n------------------------")
@@ -277,6 +290,7 @@ class Application:
     # TODO need mappers for different controllers
     def addProgramController(self, source, type=BEATSTEP_CONTROLLER):
         self.patch(source,self.controller_sink)
+
 
     def process_events(self):
         while self.patchQueue.process():
@@ -455,13 +469,14 @@ class Application:
             if result: didsomething = True
         if not didsomething:
             self.update_display()
+            self.render_display()
             time.sleep(0.001)
         return
 
 
     def main(self):
         # add Internal clock to steps if it is patched to anything
-        if 'internal_clock' in self.patchQueue.patches:
+        if 'internal_clock' in self.patchQueue.patches and self.internal_clock:
            self.steps.insert( 0, self.internal_clock )
     
         self.print_patch()

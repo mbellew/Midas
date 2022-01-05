@@ -6,6 +6,15 @@ from app.Carpeggio import Carpeggio, CarpeggioRand, CarpeggioGenerative
 app = Application()
 q = app.patchQueue
 
+
+#
+# CLOCK
+#
+
+app.useExternalClock('IAC Driver Bus 1_clock')
+#app.useInternalClock(90)
+
+
 #
 # MODULES
 #
@@ -19,13 +28,6 @@ CarpeggioGenerative(q, "carpeggio_clock_in", "carpeggio_cc_in", "carpeggio_out",
 # 
 # PATCH!
 #
-
-# USE THIS IF THERE IS NO EXTERNAL MIDI CLOCK
-#app.patch('internal_clock','timekeeper_in')
-app.patch('knobs','internal_clock_cc')
-
-# get clock from MPC over IAC Bus
-app.patch('IAC Driver Bus 1_clock','timekeeper_in')
 
 # sequencer needs clock, and supports control_change messages
 app.patch('clock','rhythm_clock_in')
