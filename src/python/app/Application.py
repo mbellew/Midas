@@ -256,9 +256,9 @@ class Application:
 
     
     def useInternalClock(self, bpm=90):
-        self.internal_clock = InternalClock(q, 'internal_clock', bpm, PPQ)
+        self.internal_clock = InternalClock(self.patchQueue, 'internal_clock', bpm, PPQ)
         self.patch('internal_clock','timekeeper_in')
-        self.patch('knobs','internal_clock_cc')
+        # TODO self.patch('knobs','internal_clock_cc')
 
 
     def useExternalClock(self, source):
@@ -267,14 +267,20 @@ class Application:
 
 
     def update_display(self,repaint=False):
+        #TODO check if current_program or bpm have changed
+        if self.internal_clock:
+            self.screen.right(0,75,str(self.internal_clock.bpm))
+        else:
+            self.screen.right(0,75,"ext")
         for i in range(0,len(self.programs)):
-            self.screen.right(i*8,1,str(i),pad=2)
-            self.screen.write(i*8,4,self.programs[i].get_display_name())
+            row = i*8+1
+            self.screen.right(row,1,str(i),pad=2)
+            self.screen.write(row,4,self.programs[i].get_display_name())
             if i==self.current_program:
-                for r in range(i*8,i*8+7):
+                for r in range(row,row+7):
                     self.screen.write(r,0,'|',eol=False)
             else:
-                for r in range(i*8,i*8+7):
+                for r in range(row,row+7):
                     self.screen.write(r,0,' ',eol=False)
 
 
