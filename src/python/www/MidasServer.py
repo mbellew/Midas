@@ -5,79 +5,72 @@ import aiohttp
 from aiohttp import web
 import asyncio
 
-# TODO pass this to http_handler() somehow, instead of having global
-# TODO learn signals/events in asyncio
-WEB_DIR = None
-MESSAGE = ' pong '
-# BUGBUG
-message_changed = False
-new_message_event = asyncio.Event()
-
-
-async def http_handler(request):
-    request_path = request.url.path
-    if request_path == '/':
-        request_path = '/index.html'
-    elif -1 != request_path.find(".."):
-        raise web.HTTPNotFound()
-    elif -1 != request_path.find("/", 1):
-        raise web.HTTPNotFound()
-    os_path = WEB_DIR + request_path
-    if os.path.exists(os_path):
-        return web.FileResponse(os_path)
-
-
-async def websocket_handler(request):
-    global MESSAGE, new_message_event, message_changed
-    ws = web.WebSocketResponse()
-    await ws.prepare(request)
-    async for msg in ws:
-        if msg.type == aiohttp.WSMsgType.TEXT:
-            if msg.data == 'close':
-                await ws.close()
-            else:
-                for i in range(0,5):
-                    if msg.data == 'ping' or message_changed:
-                        break
-                    await asyncio.sleep(0.1)
-                await ws.send_str(MESSAGE)
-                message_changed = False
-        elif msg.type == aiohttp.WSMsgType.ERROR:
-            print('ws connection closed with exception %s' % ws.exception())
-    return ws
-
-
-async def start_server(host="127.0.0.1", port=1337):
-    app = web.Application()
-    app.add_routes([
-        web.get('/ws', websocket_handler),
-        web.get('/{file}', http_handler),
-        web.get('/', http_handler),
-    ])
-    runner = web.AppRunner(app)
-    await runner.setup()
-    site = web.TCPSite(runner, host, port)
-    await site.start()
-
 
 class MidasServer:
     def __init__(self, hostName="localhost", serverPort=8080):
-        global WEB_DIR
         self.hostName = hostName
         self.serverPort = serverPort
         self.thread = None
         self.loop = None
         self.web_server_running = False
-        if not WEB_DIR:
-            webdir = os.getcwd()
-            if webdir.endswith("/static"):
-                pass
-            elif webdir.endswith("/www"):
-                webdir = webdir + "/static"
-            else:
-                webdir = webdir + "/www/static"
-            WEB_DIR = webdir
-        self.webdir = WEB_DIR
+        webdir = os.getcwd()
+        if webdir.endswith("/static"):
+            pass
+        elif webdir.endswith("/www"):
+            webdir = webdir + "/static"
+        else:
+            webdir = webdir + "/www/static"
+        self.webdir = webdir
+        self.message = ' pong '
+        # BUGBUG learn how asyncio signalling works!
+        self.message_changed = False
+        self.new_message_event = asyncio.Event()
+
+
+    async def start_server(self):
+        app = web.Application()
+        app.add_routes([
+            web.get('/ws', lambda request: self.websocket_handler(request)),
+            web.get('/{file}', lambda request: self.http_handler(request)),
+            web.get('/', lambda request: self.http_handler(request)),
+        ])
+        runner = web.AppRunner(app)
+        await runner.setup()
+        site = web.TCPSite(runner, self.hostName, self.serverPort)
+        await site.start()
+
+
+    async def http_handler(self, request):
+        request_path = request.url.path
+        if request_path == '/':
+            request_path = '/index.html'
+        elif -1 != request_path.find(".."):
+            raise web.HTTPNotFound()
+        elif -1 != request_path.find("/", 1):
+            raise web.HTTPNotFound()
+        os_path = self.webdir + request_path
+        if os.path.exists(os_path):
+            return web.FileResponse(os_path)
+
+
+    async def websocket_handler(self, request):
+        ws = web.WebSocketResponse()
+        await ws.prepare(request)
+        async for msg in ws:
+            if msg.type == aiohttp.WSMsgType.TEXT:
+                if msg.data == 'close':
+                    await ws.close()
+                else:
+                    for i in range(0,5):
+                        if msg.data == 'ping' or self.message_changed:
+                            break
+                        await asyncio.sleep(0.1)
+                    await ws.send_str(self.message)
+                    self.message_changed = False
+            elif msg.type == aiohttp.WSMsgType.ERROR:
+                print('ws connection closed with exception %s' % ws.exception())
+        return ws
+
 
     def run_in_background(self):
         self.web_server_running = True
@@ -100,7 +93,7 @@ class MidasServer:
         try:
             print("Starting server http://%s:%s" % (self.hostName, self.serverPort))
             self.loop = asyncio.get_event_loop()
-            self.loop.run_until_complete(start_server(self.hostName, self.serverPort))
+            self.loop.run_until_complete(self.start_server())
             self.loop.run_forever()
         except KeyboardInterrupt:
             pass
@@ -111,10 +104,9 @@ class MidasServer:
 
 
     def update(self, message):
-        global MESSAGE, new_message_event, message_changed
-        MESSAGE = message
-        new_message_event.set()
-        message_changed = True
+        self.message = message
+        self.new_message_event.set()
+        self.message_changed = True
 
 
 if __name__ == "__main__":
