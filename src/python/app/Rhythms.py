@@ -370,6 +370,14 @@ class VolcaBeats(GeneralMidiDrumKit):
             "Hand Clap","Claves","High Agogo","Crash Cymbal 1"])
 
 
+class CircuitTrackDrumKit(NotesDrumKit):
+    def __init__(self):
+        #super().__init__([36, 38, 40, 41])
+        #super().__init__([48, 50, 52, 53])
+        #super().__init__([24, 26, 28, 29])
+        super().__init__([60, 62, 64, 65])
+
+
 # Key mapping seems to vary by drum kit!, but often follows GeneralMidiDrum numbering
 # recommend using "Edit/Program/Note Mapping..." to pick a predefined key mapping OR match Spark() pattern C6 semi-tones
 class MpcDrumKit(NotesDrumKit):
