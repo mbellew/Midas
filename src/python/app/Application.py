@@ -102,6 +102,7 @@ class MidiChannelFilter:
         self.out_channel = in_channel if out_channel == -1 else out_channel
         self.name = "midi(" + str(self.in_channel) + "-> " + str(self.out_channel) + ")"
 
+
     def handle(self, event):
         if EVENT_MIDI != event.code:
             return
@@ -267,6 +268,7 @@ class Application:
 
     def __init__(self):
         global PPQ
+        self.webserver = None
         self.screen = DisplayArea.screen(25, 80)
         self.screen.dirty = True
         self.lastPulse = -1
@@ -352,9 +354,11 @@ class Application:
         if not force and not self.screen.isDirty():
             return
         s = self.screen.toString()
-        print("\n\n\n\n\n\n\n\n------------------------")
+        print("------------------------")
         print(s)
         print("------------------------")
+        if self.webserver:
+            self.webserver.update(s)
 
 
     def addProgramController(self, source, type):
@@ -553,12 +557,12 @@ class Application:
         self.print_patch()
         self.patchQueue.optimize()
 
-        webserver = MidasServer().run_in_background()
+        self.webserver = MidasServer().run_in_background()
 
         try:
             while True:
                 self.loop()
         except KeyboardInterrupt:
             self.timeKeeper.handle(Event(EVENT_MIDI, 'KeyboardInterrupt', mido.Message('stop')))
-            if webserver:
-                webserver.stop()
+            if self.webserver:
+                self.webserver.stop()

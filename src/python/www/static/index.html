@@ -67,8 +67,12 @@
                 this.socket.addEventListener('error', function(event) {
                     self.setState({screen: "WebSocket ERROR -- " + href})
                 }, );
+                this.socket.addEventListener('open', function(event) {
+                    self.socket.send("ping");
+                });
                 this.socket.addEventListener('message', function(event) {
                     self.setState({screen: event.data});
+                    self.socket.send("?");
                 });
             }
         }

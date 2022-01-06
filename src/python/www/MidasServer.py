@@ -1,60 +1,17 @@
-from http.server import BaseHTTPRequestHandler, HTTPServer
 import threading
 import time
-
-# class _MidasServlet(BaseHTTPRequestHandler):
-#     def do_GET(self):
-#         self.send_response(200)
-#         self.send_header("Content-type", "text/html")
-#         self.end_headers()
-#         self.wfile.write(bytes(
-#             "<html><head><title>Midas</title></head>" +
-#             ("<p>Request: %s</p>" % self.path) +
-#             "<body>" +
-#             "<p>This is an example web server.</p>" +
-#             "</body></html>", "utf-8"))
-#
-#
-#
-# class MidasServer:
-#     def __init__(self, hostName="localhost", serverPort=8080):
-#         self.hostName = hostName
-#         self.serverPort = serverPort
-#         self.webServer = HTTPServer((hostName, serverPort), _MidasServlet)
-#         self.thread = None
-#
-#     def run_in_background(self):
-#         if not self.thread:
-#             self.thread = threading.Thread(target=lambda : self.run())
-#             self.thread.start()
-#         return self
-#
-#     def stop(self):
-#         if self.thread:
-#             self.webServer.shutdown()
-#             self.thread.join()
-#
-#     def run(self):
-#         print("Starting server http://%s:%s" % (self.hostName, self.serverPort))
-#
-#         try:
-#             self.webServer.serve_forever()
-#         except KeyboardInterrupt:
-#             pass
-#
-#         self.webServer.server_close()
-#         print("Server http://%s:%s stopped." % (self.hostName, self.serverPort))
-
-# ------------------
-
-import sys
 import os
 import aiohttp
-from aiohttp import web, WSCloseCode
+from aiohttp import web
 import asyncio
 
 # TODO pass this to http_handler() somehow, instead of having global
+# TODO learn signals/events in asyncio
 WEB_DIR = None
+MESSAGE = ' pong '
+# BUGBUG
+message_changed = False
+new_message_event = asyncio.Event()
 
 
 async def http_handler(request):
@@ -71,18 +28,22 @@ async def http_handler(request):
 
 
 async def websocket_handler(request):
+    global MESSAGE, new_message_event, message_changed
     ws = web.WebSocketResponse()
     await ws.prepare(request)
-
     async for msg in ws:
         if msg.type == aiohttp.WSMsgType.TEXT:
             if msg.data == 'close':
                 await ws.close()
             else:
-                await ws.send_str('some websocket message payload')
+                for i in range(0,5):
+                    if msg.data == 'ping' or message_changed:
+                        break
+                    await asyncio.sleep(0.1)
+                await ws.send_str(MESSAGE)
+                message_changed = False
         elif msg.type == aiohttp.WSMsgType.ERROR:
             print('ws connection closed with exception %s' % ws.exception())
-
     return ws
 
 
@@ -147,6 +108,13 @@ class MidasServer:
         self.loop = None
         self.web_server_running = False
         print("Server http://%s:%s stopped." % (self.hostName, self.serverPort))
+
+
+    def update(self, message):
+        global MESSAGE, new_message_event, message_changed
+        MESSAGE = message
+        new_message_event.set()
+        message_changed = True
 
 
 if __name__ == "__main__":
