@@ -8,6 +8,8 @@ from app.Rhythms import *
 from app.TimeKeeper import TimeKeeper, InternalClock
 
 # I think this is most common
+from www.MidasServer import MidasServer
+
 PPQ = 24
 
 # channels are 0 based which is confusing, here are some constants
@@ -163,47 +165,102 @@ class ProgramController:
         self.app = app
         self.shifted = False
 
+    # normalize to shift/pg next/pg prev/knobs=0-15/pads=16-31
+    def remap(self, msg):
+        return msg
+
+    def shift(self, shifted):
+        self.shifted = shifted
+        return None
+
+    def program_next(self):
+        self.app.current_program = (self.app.current_program + 1) % len(self.app.programs)
+        self.app.repaint = True
+        return None
+
+    def program_prev(self):
+        self.app.current_program = (self.app.current_program + len(self.app.programs) - 1) % len(self.app.programs)
+        self.app.repaint = True
+        return None
+
     def handle(self, event):
-        if len(self.app.programs)==0:
+        if event.code != EVENT_MIDI or len(self.app.programs) == 0:
             return
-        if event.code != EVENT_MIDI:
+
+        msg = self.remap(event.obj)
+        if not msg:
             return
-        msg = event.obj
         program_change = None
 
-        if msg.type == 'control_change' and msg.channel == CH16:
-            # can't seem to change msg.control on BEATSTEP/STOP (always 1), but I can set channel to CH16
-            if msg.control == 1 or msg.control == 127:
+        # BEATSTEP
+        # if msg.type == 'control_change' and msg.channel == CH16:
+        #     # can't seem to change msg.control on BEATSTEP/STOP (always 1), but I can set channel to CH16
+        #     if msg.control == 1 or msg.control == 127:
+        #         self.shifted = msg.value == 127
+        #     return
+        # TWISTER
+        if msg.type == 'control_change' and msg.channel == CH4:
+            # left-top side button
+            if msg.control == 8:
                 self.shifted = msg.value == 127
             return
 
         pad = None
-        # ASSUME PADS ARE channel2 0-15 or any channel 16-31
-        if msg.type == 'control_change' and (
-                (msg.channel == CH2 and 0 <= msg.control < 16) or
-                (16 <= msg.control < 32)):
+        # ASSUME PADS ARE (channel=2 control=0-15) or (channel=* control 16-31)
+        if msg.type == 'control_change' and (16 <= msg.control < 32):
             pad = msg.control % 16
 
         if msg.type == 'program_change':
             program_change = msg.program
-        # ASSUME PADS ARE channel2 0-15 or any channel 16-31
         elif self.shifted and pad is not None:
             program_change = pad
-        # "level" wheel on beatstep
-        elif msg.type == 'control_change' and msg.control == 100 and (msg.value==1 or msg.value == 127):
-            if msg.value == 127:
-                program_change = self.app.current_program + len(self.app.programs) - 1
-            else:
-                program_change = self.app.current_program + 1
-            program_change = program_change % len(self.app.programs)
         if program_change is not None and program_change < len(self.app.programs):
             if self.app.current_program != program_change:
                 self.app.current_program = program_change
                 self.app.repaint = True
         elif msg.type == 'control_change':
-            if self.app.current_program >= 0 and self.app.current_program < len(self.app.programs):
+            if 0 <= self.app.current_program < len(self.app.programs):
                 self.app.programs[self.app.current_program].get_control_sink().add(event)
         return
+
+
+class ProgramControllerBeatStepCustomMap(ProgramController):
+    def __init__(self, app):
+        super().__init__(app)
+
+    def remap(self, msg):
+        if msg.type == 'control_change':
+            if msg.channel == CH16:
+                # can't seem to change msg.control on BEATSTEP/STOP (always 1), but I can set channel to CH16
+                if msg.control == 1 or msg.control == 127:
+                    return self.shift(msg.value == 127)
+                return None
+                # "level" wheel on beatstep (TODO move to subclass)
+            elif msg.control == 100 and (msg.value==1 or msg.value == 127):
+                if msg.value == 127:
+                    return self.program_prev()
+                else:
+                    return self.program_next()
+            elif msg.control >= 16:
+                return msg.copy(control = (msg.control % 16) + 16)
+        return msg
+
+
+class ProgramControllerFighterTwister(ProgramController):
+    def __init__(self, app):
+        super().__init__(app)
+
+    def remap(self, msg):
+        # TWISTER
+        if msg.type == 'control_change':
+            if msg.channel == CH4:
+                # left-top side button
+                if msg.control == 8:
+                    return self.shift(msg.value == 127)
+                return None
+            if msg.channel == CH2:
+                return msg.copy(control = (msg.control % 16) + 16)
+        return msg
 
 
 class Application:
@@ -223,7 +280,9 @@ class Application:
         # for controller patching and UI rendering
         self.programs = []
         self.current_program = 0
-        self.controller_sink = self.sink("controller_sink", ProgramController(self))
+        self.controller_sink = {}
+        self.controller_sink[BEATSTEP_CONTROLLER] = self.sink("controller_bs_sink", ProgramControllerBeatStepCustomMap(self))
+        self.controller_sink[TWISTER_CONTROLLER] = self.sink("controller_tw_sink", ProgramControllerFighterTwister(self))
         self.repaint = True
 
         #
@@ -249,7 +308,7 @@ class Application:
         return self.output_channels[ch].sink_name
 
 
-    def addProgram(self,module):
+    def addProgram(self, module):
         # fail fast, see if this is a program module
         if not module.isProgramModule():
             raise Exception("bad config")
@@ -298,9 +357,10 @@ class Application:
         print("------------------------")
 
 
-    # TODO need mappers for different controllers
-    def addProgramController(self, source, type=BEATSTEP_CONTROLLER):
-        self.patch(source,self.controller_sink)
+    def addProgramController(self, source, type):
+        sink = self.controller_sink[type]
+        if sink:
+            self.patch(source, sink)
 
 
     def process_events(self):
@@ -493,7 +553,7 @@ class Application:
         self.print_patch()
         self.patchQueue.optimize()
 
-        webserver = None  # MidasServer().run_in_background()
+        webserver = MidasServer().run_in_background()
 
         try:
             while True:

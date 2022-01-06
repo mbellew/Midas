@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Midas controller</title>
+<style>
+    BODY { background-color: #222222; }
+    DIV#application {
+        background-color: #000000; color:green;
+        display: inline-block;
+        margin:3px; padding:3px;
+        border: 1px solid #444444;
+    }
+    SPAN.line { display: block; }
+    PRE {}
+</style>
+<script src="react.development.js"></script>
+<script src="react-dom.development.js"></script>
+<script>
+    class LINE extends React.Component {
+        render() {
+            return React.createElement('span', {className: 'line'}, this.props.line);
+        }
+    }
+
+    class CRT extends React.Component {
+        constructor() {
+            super();
+            this.empty_line = ' '.repeat(80);
+        }
+        process(s) {
+            s = s || "";
+            let lines = s.trim().split("\n");
+            while (lines.length < 25)
+                lines.push(this.empty_line)
+            return lines
+        }
+
+        render() {
+            const lines = this.process(this.props.screen);
+            const lineFN = function (l, i) {
+                return React.createElement(LINE, {key: ("line" + i), line: l});
+            }
+            return React.createElement('pre', {}, lines.map(lineFN));
+        }
+    }
+
+    class App extends React.Component {
+        constructor(props) {
+            super(props);
+            this.state = {screen: "\n\n  loading"};
+            this.socket = null
+        }
+
+        static getDerivedStateFromProps(props, state) {
+            return {screen: (props.screen || state.screen)}
+        }
+
+        componentDidMount() {
+            // setTimeout(() => {
+            //     this.setState({screen: "updated"})
+            // }, 1000);
+            if (location.host && (location.protocol === 'https:' || location.protocol === 'http:')) {
+                const href = (location.protocol === 'https:' ? 'wss:' : 'ws:') + "//" + location.host + "/ws"
+                self = this;
+                this.socket = new WebSocket(href);
+                this.socket.addEventListener('error', function(event) {
+                    self.setState({screen: "WebSocket ERROR -- " + href})
+                }, );
+                this.socket.addEventListener('message', function(event) {
+                    self.setState({screen: event.data});
+                });
+            }
+        }
+
+        render() {
+            return React.createElement(CRT, {screen: this.state.screen});
+        }
+    }
+
+    window.onload = function () {
+        ReactDOM.render(
+            React.createElement(App, null),
+            document.getElementById('application')
+        );
+    }
+</script>
+</head>
+<body>
+<div id="application"></div>
+</body>
+</html>

@@ -11,7 +11,7 @@ q = app.patchQueue
 #
 
 app.useExternalClock('mio_clock')
-#app.useInternalClock(90)
+# app.useInternalClock(90)
 
 
 #
@@ -20,7 +20,7 @@ app.useExternalClock('mio_clock')
 
 # Create the modules we want to use
 # "Programs" are modules that have CC control and/or show up in the 'UI'
-# TODO have addProgram() wire up clock_in
+# TODO have addProgram() wire up clock_in and ppq
 
 app.addProgramController('Arturia BeatStep_in', BEATSTEP_CONTROLLER)
 app.addProgramController('Midi Fighter Twister_in', TWISTER_CONTROLLER)
@@ -51,8 +51,6 @@ app.patch('clock', 'carpeggio_clock_in')
 app.patch('carpeggio_out', arpOut)
 app.patch('carpeggio_drone', droneOut)   
 
-#app.patch('keyboard','mio_sink')
-app.patch('Arturia BeatStep_in','debug')
-#app.patch('knobs','debug')
+# app.patch('Arturia BeatStep_in','debug')
 
 app.main()
