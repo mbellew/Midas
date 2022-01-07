@@ -30,7 +30,7 @@ class AbstractModule(Module):
         elif msg.type == 'note_on' or msg.type == 'note_off':
             self.handle_note(msg)
 
-    def handle_cc(self,msg):
+    def handle_cc(self, msg):
         self.ccmap.dispatch(msg)
 
     def handle_clock(self,pulse):

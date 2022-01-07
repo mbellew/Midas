@@ -18,7 +18,7 @@ class Point:
         self.handler = handler
 
     def add(self, event):
-        self.parent.add(event, self)
+        self.parent.dispatchEvent(event, self)
 
     def add_first(self, event):
         self.parent.add_first(event, self)

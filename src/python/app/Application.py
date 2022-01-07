@@ -1,3 +1,4 @@
+import asyncio
 import datetime
 import time
 
@@ -17,9 +18,22 @@ PPQ = 24
 
 BEATSTEP_CONTROLLER = "BEATSTEP"
 TWISTER_CONTROLLER = "TWISTER"
+AKAIMIDIMIX_CONTROLLER = "AKAIMIDIMIX"
 
 
 __unique__ = 100
+
+
+def make_mido_stream():
+    loop = asyncio.get_event_loop()
+    queue = asyncio.Queue()
+    def callback(message):
+        loop.call_soon_threadsafe(queue.put_nowait, message)
+    async def stream():
+        while True:
+            yield await queue.get()
+    return callback, stream()
+
 
 def unique_name(s):
     global __unique__
@@ -51,7 +65,7 @@ class DebugSendNotes:
 
 class MidiInputStep:
     def __init__(self, q, port_name, point, clock=None):
-        #self.port = mido.open_input(port_name, callback=lambda m : self.on_message(m))
+        # self.port = mido.open_input(port_name, callback=lambda m : self.on_message(m))
         self.port = mido.open_input(port_name)
         self.point = q.createSource(point)
         self.clock = None if clock is None else q.createSource(clock)    
@@ -176,11 +190,13 @@ class ProgramController:
 
     def program_next(self):
         self.app.current_program = (self.app.current_program + 1) % len(self.app.programs)
+        self.app.current_program_sink = self.app.programs[self.app.current_program].get_control_sink()
         self.app.repaint = True
         return None
 
     def program_prev(self):
         self.app.current_program = (self.app.current_program + len(self.app.programs) - 1) % len(self.app.programs)
+        self.app.current_program_sink = self.app.programs[self.app.current_program].get_control_sink()
         self.app.repaint = True
         return None
 
@@ -192,19 +208,6 @@ class ProgramController:
         if not msg:
             return
         program_change = None
-
-        # BEATSTEP
-        # if msg.type == 'control_change' and msg.channel == CH16:
-        #     # can't seem to change msg.control on BEATSTEP/STOP (always 1), but I can set channel to CH16
-        #     if msg.control == 1 or msg.control == 127:
-        #         self.shifted = msg.value == 127
-        #     return
-        # TWISTER
-        if msg.type == 'control_change' and msg.channel == CH4:
-            # left-top side button
-            if msg.control == 8:
-                self.shifted = msg.value == 127
-            return
 
         pad = None
         # ASSUME PADS ARE (channel=2 control=0-15) or (channel=* control 16-31)
@@ -218,14 +221,50 @@ class ProgramController:
         if program_change is not None and program_change < len(self.app.programs):
             if self.app.current_program != program_change:
                 self.app.current_program = program_change
+                self.app.current_program_sink = self.app.programs[self.app.current_program].get_control_sink()
                 self.app.repaint = True
         elif msg.type == 'control_change':
-            if 0 <= self.app.current_program < len(self.app.programs):
-                self.app.programs[self.app.current_program].get_control_sink().add(event)
+            if self.app.current_program_sink:
+                self.app.current_program_sink.add(Event(EVENT_MIDI, event.source, msg))
         return
 
 
-class ProgramControllerBeatStepCustomMap(ProgramController):
+class AkaiMidiMix(ProgramController):
+    def __init__(self, app):
+        super().__init__(app)
+
+    def remap(self, msg):
+        # KNOBS
+        if msg.type == 'control_change':
+            if msg.control >= 16:
+                control = msg.control-30 if msg.control >= 48 else msg.control-16
+                col = int(control / 4)
+                row = int(control % 4)
+                # ignore rows 3 and 4
+                if row > 1 or col > 7:
+                    return None
+                return msg.copy(control=row * 8 + col)
+            # BUTTONS
+        elif msg.type == 'note_on' or msg.type == 'note_off':
+            if msg.note == 25:
+                return None if msg.type == 'note_off' else self.program_next()
+            elif msg.note == 26:
+                return None if msg.type == 'note_off' else self.program_prev()
+            elif msg.note == 27:
+                return self.shift(msg.type=='note_on')
+            elif msg.note >= 1:
+                note = msg.note-1
+                col = int(note / 3)
+                row = note % 3
+                if row > 2 or col > 7:
+                    return None
+                control = 16 + col if row == 0 else 24 + col
+                value = 0 if msg.type == 'note_off' else 127
+                return mido.Message('control_change', control=control, value=value)
+        return None
+
+
+class BeatStepCustomMap(ProgramController):
     def __init__(self, app):
         super().__init__(app)
 
@@ -247,7 +286,7 @@ class ProgramControllerBeatStepCustomMap(ProgramController):
         return msg
 
 
-class ProgramControllerFighterTwister(ProgramController):
+class FighterTwister(ProgramController):
     def __init__(self, app):
         super().__init__(app)
 
@@ -282,9 +321,12 @@ class Application:
         # for controller patching and UI rendering
         self.programs = []
         self.current_program = 0
-        self.controller_sink = {}
-        self.controller_sink[BEATSTEP_CONTROLLER] = self.sink("controller_bs_sink", ProgramControllerBeatStepCustomMap(self))
-        self.controller_sink[TWISTER_CONTROLLER] = self.sink("controller_tw_sink", ProgramControllerFighterTwister(self))
+        self.current_program_sink = None
+        self.controller_sink = {
+            BEATSTEP_CONTROLLER: self.sink("controller_bs_sink", BeatStepCustomMap(self)),
+            TWISTER_CONTROLLER: self.sink("controller_tw_sink", FighterTwister(self)),
+            AKAIMIDIMIX_CONTROLLER: self.sink("controller_mm_sink", AkaiMidiMix(self))}
+
         self.repaint = True
 
         #
@@ -314,10 +356,12 @@ class Application:
         # fail fast, see if this is a program module
         if not module.isProgramModule():
             raise Exception("bad config")
-        i = len(self.programs)
-        module.set_display_area(self.screen.subArea(i*8+2, 8, 7, 40))
+        p = len(self.programs)
+        module.set_display_area(self.screen.subArea(p*8+2, 8, 7, 40))
         module.update_display()
         self.programs.append(module)
+        if p == self.current_program:
+            self.current_program_sink = self.programs[p].get_control_sink()
         pass
 
     
@@ -350,7 +394,7 @@ class Application:
                     self.screen.write(r,0,' ',eol=False)
 
 
-    def render_display(self, force=False):
+    async def render_display(self, force=False):
         if not force and not self.screen.isDirty():
             return
         s = self.screen.toString()
@@ -358,7 +402,7 @@ class Application:
         print(s)
         print("------------------------")
         if self.webserver:
-            self.webserver.update(s)
+            await self.webserver.update(s)
 
 
     def addProgramController(self, source, type):
@@ -537,19 +581,20 @@ class Application:
         print("")
 
 
-    def loop(self):
+    async def loop(self):
         didsomething = False
         for step in self.steps:
             result = step.process()
-            if result: didsomething = True
+            if result:
+                didsomething = True
         if not didsomething:
             self.update_display()
-            self.render_display()
-            time.sleep(0.001)
+            await self.render_display()
+            await asyncio.sleep(0.001)
         return
 
 
-    def main(self):
+    async def _main(self):
         # add Internal clock to steps if it is patched to anything
         if 'internal_clock' in self.patchQueue.patches and self.internal_clock:
            self.steps.insert( 0, self.internal_clock )
@@ -561,8 +606,12 @@ class Application:
 
         try:
             while True:
-                self.loop()
+                await self.loop()
         except KeyboardInterrupt:
             self.timeKeeper.handle(Event(EVENT_MIDI, 'KeyboardInterrupt', mido.Message('stop')))
             if self.webserver:
                 self.webserver.stop()
+
+
+    def main(self):
+        asyncio.run(self._main())
