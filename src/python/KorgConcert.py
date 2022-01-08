@@ -1,5 +1,4 @@
 from app.Application import *
-from app.Application import *
 from app.Carpeggio import CarpeggioGenerative
 from app.Rhythms import RhythmModule, VolcaBeats
 
@@ -24,6 +23,7 @@ app.useExternalClock('mio_clock')
 
 app.addProgramController('Arturia BeatStep_in', BEATSTEP_CONTROLLER)
 app.addProgramController('Midi Fighter Twister_in', TWISTER_CONTROLLER)
+app.addProgramController('MIDI Mix_in', AKAIMIDIMIX_CONTROLLER)
 
 DebugModule(q, 'debug')
 app.addProgram(RhythmModule(q, "rhythm_clock_in", "rhythm_cc_in", "rhythm_out", drumkit=VolcaBeats(), ppq=PPQ))
@@ -51,6 +51,7 @@ app.patch('clock', 'carpeggio_clock_in')
 app.patch('carpeggio_out', arpOut)
 app.patch('carpeggio_drone', droneOut)   
 
-# app.patch('Arturia BeatStep_in','debug')
+# app.patch('Arturia BeatStep_in', 'debug')
+app.patch('carpeggio_out', 'debug')
 
 app.main()

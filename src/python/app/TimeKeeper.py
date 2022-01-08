@@ -8,10 +8,15 @@ class InternalClock:
     """generate 'real' midi clock messages if there is no external source.  This can be used by TimeKeeper
     if there is no external clock"""
     def __init__(self, q, source_name, bpm, ppq=48, sink_name='internal_clock_cc'):
+        self.last_time = None
+        self.start_time = None
+        self.current_pulse = None
+        self.current_pulse = None
+        self.pulse_length = None
+        self.bpm = None
         self.sink = q.createSink('internal_clock_cc', self)
         self.out = q.createSource(source_name)
         self.ppq = ppq
-        self.bpm = -1
         self.reset()
         self.update_bpm(bpm)
         self.ccmap = MidiMap()
@@ -56,7 +61,6 @@ class InternalClock:
 
 
     def process(self):
-        global MIDI_CLOCK_MESSAGE
         time = datetime.now()
         if self.start_time == -1:
             self.start_time = time
@@ -84,7 +88,6 @@ class Signature:
 class Pulse:
     """can't really extends mido.Message so use our own internal class"""
     def __init__(self, midi, sig):
-        global MIDI_CLOCK_MESSAGE
         # these are position variables
         self.time  = midi.time                                                  # current pulse since 'start' (zero based)
         self.beat_num      = int((self.time % sig.pulses_per_measure) / sig.pulses_per_beat)                       # zero-based "0 and 1 and 2 and 3 and"
@@ -123,3 +126,8 @@ class TimeKeeper:
         elif msg.type == 'stop':
             self.current_pulse = 0
             self.out.add(Event(EVENT_STOP, event.source+'/timekeeper', None))
+
+
+    def stop(self):
+        self.current_pulse = 0
+        self.out.add(Event(EVENT_STOP, "timekeeper.stop()", None))

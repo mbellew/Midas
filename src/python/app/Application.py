@@ -1,6 +1,6 @@
 import asyncio
 import datetime
-import time
+import code, traceback, signal
 
 from app.DisplayArea import DisplayArea
 from app.Module import AbstractModule
@@ -8,9 +8,9 @@ from app.PatchQueue import PatchQueue, SINK_POINT, SOURCE_POINT
 from app.Rhythms import *
 from app.TimeKeeper import TimeKeeper, InternalClock
 
-# I think this is most common
 from www.MidasServer import MidasServer
 
+# I think this is most common
 PPQ = 24
 
 # channels are 0 based which is confusing, here are some constants
@@ -115,7 +115,6 @@ class MidiChannelFilter:
         self.in_channel = in_channel
         self.out_channel = in_channel if out_channel == -1 else out_channel
         self.name = "midi(" + str(self.in_channel) + "-> " + str(self.out_channel) + ")"
-
 
     def handle(self, event):
         if EVENT_MIDI != event.code:
@@ -237,7 +236,7 @@ class AkaiMidiMix(ProgramController):
         # KNOBS
         if msg.type == 'control_change':
             if msg.control >= 16:
-                control = msg.control-30 if msg.control >= 48 else msg.control-16
+                control = msg.control-30 if msg.control >= 46 else msg.control-16
                 col = int(control / 4)
                 row = int(control % 4)
                 # ignore rows 3 and 4
@@ -256,9 +255,10 @@ class AkaiMidiMix(ProgramController):
                 note = msg.note-1
                 col = int(note / 3)
                 row = note % 3
-                if row > 2 or col > 7:
+                if row > 3 or col > 7:
                     return None
-                control = 16 + col if row == 0 else 24 + col
+                # row 0 shifts to row 1, row 2 does not shift
+                control = 16 + col if row < 2 else 24 + col
                 value = 0 if msg.type == 'note_off' else 127
                 return mido.Message('control_change', control=control, value=value)
         return None
@@ -307,6 +307,7 @@ class Application:
 
     def __init__(self):
         global PPQ
+        self.stopped = False
         self.webserver = None
         self.screen = DisplayArea.screen(25, 80)
         self.screen.dirty = True
@@ -368,6 +369,7 @@ class Application:
     def useInternalClock(self, bpm=90):
         self.internal_clock = InternalClock(self.patchQueue, 'internal_clock', bpm, PPQ)
         self.patch('internal_clock','timekeeper_in')
+        self.steps.insert(0, self.internal_clock)
         # TODO self.patch('knobs','internal_clock_cc')
 
 
@@ -582,36 +584,59 @@ class Application:
 
 
     async def loop(self):
-        didsomething = False
-        for step in self.steps:
-            result = step.process()
-            if result:
-                didsomething = True
-        if not didsomething:
-            self.update_display()
-            await self.render_display()
-            await asyncio.sleep(0.001)
+        try:
+            did_something = False
+            for step in self.steps:
+                result = step.process()
+                if result:
+                    did_something = True
+            if not did_something:
+                self.update_display()
+                await self.render_display()
+                await asyncio.sleep(0.001)
+        except KeyboardInterrupt as ki:
+            self.stopped = True
         return
 
 
-    async def _main(self):
-        # add Internal clock to steps if it is patched to anything
-        if 'internal_clock' in self.patchQueue.patches and self.internal_clock:
-           self.steps.insert( 0, self.internal_clock )
-    
-        self.print_patch()
-        self.patchQueue.optimize()
+    def sig_int(self, sig, frame):
+        self.stopped = True
 
-        self.webserver = MidasServer().run_in_background()
+    def sig_term(self, sig, frame):
+        self.stopped = True
 
+
+    def stop(self):
+        self.stopped = True
+        self.timeKeeper.stop()
+        self.patchQueue.stop()
+        if self.webserver:
+            self.webserver.stop()
+        thread = self.thread
+        if thread:
+            thread.join()
+
+
+    async def async_main(self):
         try:
-            while True:
+            while not self.stopped:
                 await self.loop()
-        except KeyboardInterrupt:
-            self.timeKeeper.handle(Event(EVENT_MIDI, 'KeyboardInterrupt', mido.Message('stop')))
-            if self.webserver:
-                self.webserver.stop()
+        finally:
+            self.stopped = True
 
 
     def main(self):
-        asyncio.run(self._main())
+        try:
+            signal.signal(signal.SIGINT, self.sig_int)
+            signal.signal(signal.SIGTERM, self.sig_term)
+            signal.signal(signal.SIGUSR1, dump_stacks)
+            self.print_patch()
+            self.patchQueue.optimize()
+            self.webserver = MidasServer().run_in_background()
+            asyncio.run(self.async_main())
+        except KeyboardInterrupt as kbd:
+            pass
+        finally:
+            self.stop()
+            print("finally")
+            exit(0)

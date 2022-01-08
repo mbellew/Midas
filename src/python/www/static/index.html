@@ -70,6 +70,9 @@
                 this.socket.addEventListener('open', function(event) {
                     self.socket.send("ping");
                 });
+                this.socket.addEventListener('close', function(event) {
+                    window.location.reload()
+                });
                 this.socket.addEventListener('message', function(event) {
                     self.setState({screen: event.data});
                     self.socket.send("?");

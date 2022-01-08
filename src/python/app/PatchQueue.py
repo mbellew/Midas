@@ -36,7 +36,6 @@ class PatchQueueEvent:
         self.point = point
 
 
-
 class PatchQueue:
     def __init__(self, clock_sink):
         self.stringType = type('')

@@ -11,8 +11,10 @@ class MidasServer:
         self.hostName = hostName
         self.serverPort = serverPort
         self.thread = None
+        self.app = None
+        self.site = None
         self.loop = None
-        self.web_server_running = False
+        self.stopped = False
         webdir = os.getcwd()
         if webdir.endswith("/static"):
             pass
@@ -24,20 +26,20 @@ class MidasServer:
         self.message = ' pong '
         # BUGBUG learn how asyncio signalling works!
         self.message_changed = False
-        self.new_message_event = asyncio.Event()
+        self.new_message_condition = cond = asyncio.Condition()
 
 
     async def start_server(self):
-        app = web.Application()
-        app.add_routes([
+        self.app = web.Application()
+        self.app.add_routes([
             web.get('/ws', lambda request: self.websocket_handler(request)),
             web.get('/{file}', lambda request: self.http_handler(request)),
             web.get('/', lambda request: self.http_handler(request)),
         ])
-        runner = web.AppRunner(app)
+        runner = web.AppRunner(self.app)
         await runner.setup()
-        site = web.TCPSite(runner, self.hostName, self.serverPort)
-        await site.start()
+        self.site = web.TCPSite(runner, self.hostName, self.serverPort)
+        await self.site.start()
 
 
     async def http_handler(self, request):
@@ -53,69 +55,113 @@ class MidasServer:
             return web.FileResponse(os_path)
 
 
-    async def websocket_handler(self, request):
+    async def websocket_handler_poll(self, request):
         ws = web.WebSocketResponse()
         await ws.prepare(request)
         async for msg in ws:
             if msg.type == aiohttp.WSMsgType.TEXT:
-                if msg.data == 'close':
-                    await ws.close()
-                else:
-                    for i in range(0,5):
-                        if msg.data == 'ping' or self.message_changed:
-                            break
-                        await asyncio.sleep(0.1)
-                    await ws.send_str(self.message)
-                    self.message_changed = False
+                for i in range(0, 5):
+                    if msg.data == 'ping' or self.message_changed:
+                        break
+                    await asyncio.sleep(0.2)
+                await ws.send_str(self.message)
+                self.message_changed = False
+            elif msg.type == aiohttp.WSMsgType.ERROR:
+                print('ws connection closed with exception %s' % ws.exception())
+        return ws
+
+    # async def websocket_handler_event(self, request):
+    #     ws = web.WebSocketResponse()
+    #     await ws.prepare(request)
+    #     async for msg in ws:
+    #         if msg.type == aiohttp.WSMsgType.TEXT:
+    #             if msg.data != 'ping' and not self.new_message_event.is_set():
+    #                 asyncio.wait(self.new_message_event.wait(), 0.5)
+    #             await ws.send_str(self.message)
+    #             self.new_message_event.clear()
+    #         elif msg.type == aiohttp.WSMsgType.ERROR:
+    #             print('ws connection closed with exception %s' % ws.exception())
+    #     return ws
+
+    async def websocket_handler_cond(self, request):
+        ws = web.WebSocketResponse()
+        await ws.prepare(request)
+        async for msg in ws:
+            if msg.type == aiohttp.WSMsgType.TEXT:
+                text = None
+                await self.new_message_condition.acquire()
+                try:
+                    while msg.data != 'ping' and not self.message_changed:
+                        await asyncio.wait_for(self.new_message_condition.wait(), timeout=1.0)
+                    text = self.message
+                finally:
+                    self.new_message_condition.release()
+                await ws.send_str(text)
             elif msg.type == aiohttp.WSMsgType.ERROR:
                 print('ws connection closed with exception %s' % ws.exception())
         return ws
 
 
+    async def websocket_handler(self, request):
+        return await self.websocket_handler_cond(request)
+
+
     def run_in_background(self):
-        self.web_server_running = True
         if not self.thread:
-            self.thread = threading.Thread(target=lambda: self._run())
+            self.thread = threading.Thread(target=lambda: self.run())
             self.thread.start()
         return self
 
-    def stop(self):
-        loop = self.loop
-        if loop:
-            loop.stop()
 
-    def _run(self):
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        self.run()
+    async def _stop(self):
+        self.stopped = True
+        if self.site:
+            await self.site.stop()
+        if self.app:
+            await self.app.cleanup()
+
+
+    def stop(self):
+        asyncio.run(self._stop())
+
 
     def run(self):
         try:
+            if not asyncio.get_event_loop():
+                asyncio.set_event_loop(asyncio.new_event_loop())
             print("Starting server http://%s:%s" % (self.hostName, self.serverPort))
             self.loop = asyncio.get_event_loop()
             self.loop.run_until_complete(self.start_server())
             self.loop.run_forever()
-        except KeyboardInterrupt:
-            pass
-        self.loop.stop()
-        self.loop = None
-        self.web_server_running = False
+        finally:
+            self.stopped = True
+        self.stop()
         print("Server http://%s:%s stopped." % (self.hostName, self.serverPort))
 
 
-    def update(self, message):
-        self.message = message
-        self.new_message_event.set()
-        self.message_changed = True
+    async def update(self, message):
+        await self.new_message_condition.acquire()
+        try:
+            if self.message != message:
+                self.message = message
+                self.message_changed = True
+                self.new_message_condition.notify_all()
+        finally:
+            self.new_message_condition.release()
+
 
 
 if __name__ == "__main__":
+    import signal
     server = None
     try:
         server = MidasServer()
         server.run_in_background()
-        while server.web_server_running:
+        signal.signal(signal.SIGINT, lambda sig, frame: server.stop())
+        signal.signal(signal.SIGTERM, lambda sig, frame: server.stop())
+        signal.signal(signal.SIGUSR1, lambda sig, frame: server.stop())
+        while not server.stopped:
             time.sleep(1)
-    except KeyboardInterrupt:
-        exit(1)
+    finally:
+        print("finally")
 
