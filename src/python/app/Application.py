@@ -609,12 +609,8 @@ class Application:
     def stop(self):
         self.stopped = True
         self.timeKeeper.stop()
-        self.patchQueue.stop()
         if self.webserver:
             self.webserver.stop()
-        thread = self.thread
-        if thread:
-            thread.join()
 
 
     async def async_main(self):
@@ -629,7 +625,6 @@ class Application:
         try:
             signal.signal(signal.SIGINT, self.sig_int)
             signal.signal(signal.SIGTERM, self.sig_term)
-            signal.signal(signal.SIGUSR1, dump_stacks)
             self.print_patch()
             self.patchQueue.optimize()
             self.webserver = MidasServer().run_in_background()

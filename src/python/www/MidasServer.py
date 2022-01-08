@@ -127,7 +127,9 @@ class MidasServer:
 
     def run(self):
         try:
-            if not asyncio.get_event_loop():
+            try:
+                asyncio.get_event_loop()
+            except RuntimeError as re:
                 asyncio.set_event_loop(asyncio.new_event_loop())
             print("Starting server http://%s:%s" % (self.hostName, self.serverPort))
             self.loop = asyncio.get_event_loop()
