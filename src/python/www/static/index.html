@@ -30,7 +30,7 @@
         }
         process(s) {
             s = s || "";
-            let lines = s.trim().split("\n");
+            let lines = s.split("\n");
             while (lines.length < 25)
                 lines.push(this.empty_line)
             return lines
