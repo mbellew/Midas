@@ -1,7 +1,7 @@
 from datetime import datetime
 import mido
-from app.Event import Event, EVENT_CLOCK, EVENT_MIDI, EVENT_STOP
-from app.MidiMap import MidiMap
+from midi.Event import Event, EVENT_CLOCK, EVENT_MIDI, EVENT_STOP
+from midi.MidiMap import MidiMap
 
 
 class InternalClock:

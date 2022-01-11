@@ -1,5 +1,5 @@
-from app.DelayQueue import DelayQueue
-from app.Event import EVENT_CLOCK
+from midi.DelayQueue import DelayQueue
+from midi.Event import EVENT_CLOCK
 
 # we want to act more or less single threaded, dispatchEvent is a good choke-point
 # from threading import RLock

@@ -1,6 +1,6 @@
-from app.MidiMap import MidiMap
-from app.Event import EVENT_CLOCK, EVENT_MIDI, EVENT_STOP
-from app.DisplayArea import DisplayArea
+from midi.MidiMap import MidiMap
+from midi.Event import EVENT_CLOCK, EVENT_MIDI, EVENT_STOP
+from midi.DisplayArea import DisplayArea
 
 
 class Module:

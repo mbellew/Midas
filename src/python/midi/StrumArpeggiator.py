@@ -1,4 +1,4 @@
-from app.Event import Event, EVENT_MIDI, EVENT_CONTINUE, EVENT_CLOCK
+from midi.Event import Event, EVENT_MIDI, EVENT_CONTINUE, EVENT_CLOCK
 import mido
 
 

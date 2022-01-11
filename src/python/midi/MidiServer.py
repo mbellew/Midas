@@ -1,14 +1,15 @@
 import asyncio
 import datetime
-import code, traceback, signal
+import signal
+import threading
 
-from app.DisplayArea import DisplayArea
-from app.Module import AbstractModule
-from app.PatchQueue import PatchQueue, SINK_POINT, SOURCE_POINT
-from app.Rhythms import *
-from app.TimeKeeper import TimeKeeper, InternalClock
-
-from www.MidasServer import MidasServer
+from midi.DisplayArea import DisplayArea
+from midi.GlobalState import GlobalState
+from midi.Module import AbstractModule
+from midi.PatchQueue import PatchQueue, SINK_POINT, SOURCE_POINT
+from midi.Rhythms import *
+from midi.TimeKeeper import TimeKeeper, InternalClock
+from www.HttpServer import HttpServer
 
 # I think this is most common
 PPQ = 24
@@ -303,11 +304,13 @@ class FighterTwister(ProgramController):
         return msg
 
 
-class Application:
+
+
+
+class MidiServer:
 
     def __init__(self):
         global PPQ
-        self.stopped = False
         self.webserver = None
         self.screen = DisplayArea.screen(25, 80)
         self.screen.dirty = True
@@ -403,8 +406,8 @@ class Application:
         print("------------------------")
         print(s)
         print("------------------------")
-        if self.webserver:
-            await self.webserver.update(s)
+        if GlobalState.webserver:
+            await GlobalState.webserver.update(s)
 
 
     def addProgramController(self, source, type):
@@ -533,7 +536,12 @@ class Application:
 
         # create a sink for every output
         for name in names:
-            MidiOutModule(q, name + "_sink", mido.open_output(name))
+            try:
+                MidiOutModule(q, name + "_sink", mido.open_output(name))
+            except Exception as ex:
+                print("ERROR: failed to open port '" + name + "'")
+                print(ex)
+                continue
 
         instrumentName = None
         if not instrumentName:
@@ -593,45 +601,17 @@ class Application:
             if not did_something:
                 self.update_display()
                 await self.render_display()
-                await asyncio.sleep(0.001)
-        except KeyboardInterrupt as ki:
-            self.stopped = True
-        return
+            await asyncio.sleep(0.001 if did_something else 0)
+        finally:
+            pass
 
 
-    def sig_int(self, sig, frame):
-        self.stopped = True
-
-    def sig_term(self, sig, frame):
-        self.stopped = True
+    async def loop_forever(self):
+        self.print_patch()
+        self.patchQueue.optimize()
+        while not GlobalState.stop_event.is_set():
+            await self.loop()
 
 
     def stop(self):
-        self.stopped = True
         self.timeKeeper.stop()
-        if self.webserver:
-            self.webserver.stop()
-
-
-    async def async_main(self):
-        try:
-            while not self.stopped:
-                await self.loop()
-        finally:
-            self.stopped = True
-
-
-    def main(self):
-        try:
-            signal.signal(signal.SIGINT, self.sig_int)
-            signal.signal(signal.SIGTERM, self.sig_term)
-            self.print_patch()
-            self.patchQueue.optimize()
-            self.webserver = MidasServer().run_in_background()
-            asyncio.run(self.async_main())
-        except KeyboardInterrupt as kbd:
-            pass
-        finally:
-            self.stop()
-            print("finally")
-            exit(0)

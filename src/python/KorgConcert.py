@@ -1,16 +1,17 @@
-from app.Application import *
-from app.Carpeggio import CarpeggioGenerative
-from app.Rhythms import RhythmModule, VolcaBeats
+from Application import Application
+from midi.MidiServer import *
+from midi.Carpeggio import CarpeggioGenerative
+from midi.Rhythms import RhythmModule, VolcaBeats
 
-app = Application()
+app = Application.create()
 q = app.patchQueue
 
 #
 # CLOCK
 #
 
-app.useExternalClock('mio_clock')
-# app.useInternalClock(90)
+# app.useExternalClock('mio_clock')
+app.useInternalClock(90)
 
 
 #
@@ -34,11 +35,13 @@ app.addProgram(CarpeggioGenerative(q, "carpeggio_clock_in", "carpeggio_cc_in", "
 # Configure OUTPUT channels
 #
 
-droneOut = app.setupOutputChannel(CH8, 'mio_sink', name="DRONE")
-arpOut = app.setupOutputChannel(CH9, 'mio_sink', name="ARP")
-drumOut = app.setupOutputChannel(CH10, 'mio_sink', name="DRUMS")
+# TODO app.hasDevice('name')
+output_device = 'Scarlett 4i4 USB_sink' if True else 'mio_sink'
+droneOut = app.setupOutputChannel(CH8, output_device, name="DRONE")
+arpOut = app.setupOutputChannel(CH9, output_device, name="ARP")
+drumOut = app.setupOutputChannel(CH10, output_device, name="DRUMS")
 
-# 
+#
 # PATCH!
 #
 
@@ -54,4 +57,4 @@ app.patch('carpeggio_drone', droneOut)
 # app.patch('Arturia BeatStep_in', 'debug')
 app.patch('carpeggio_out', 'debug')
 
-app.main()
+Application.run()

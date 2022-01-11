@@ -1,5 +1,5 @@
 import mido
-from app.Event import Event, EVENT_MIDI, EVENT_CLOCK
+from midi.Event import Event, EVENT_MIDI, EVENT_CLOCK
 
 
 class StrumPattern:

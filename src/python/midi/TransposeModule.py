@@ -1,4 +1,4 @@
-from app.Event import Event, EVENT_MIDI
+from midi.Event import Event, EVENT_MIDI
 
 
 class TransposeModule:

@@ -2,8 +2,8 @@ import random
 
 import mido
 
-from app.Event import *
-from app.Module import ProgramModule
+from midi.Event import *
+from midi.Module import ProgramModule
 
 Rhythm_array = []
  

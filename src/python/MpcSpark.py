@@ -1,9 +1,9 @@
-from app.StrumPattern import StrumPattern
-from app.Application import *
-from app.Rhythms import RhythmModule, MpcDrumKit, Spark, VolcaBeats, MOTORIK3
-from app.Carpeggio import Carpeggio, CarpeggioRand, CarpeggioGenerative
+from midi.StrumPattern import StrumPattern
+from midi.MidiServer import *
+from midi.Rhythms import RhythmModule, MpcDrumKit, Spark, VolcaBeats, MOTORIK3
+from midi.Carpeggio import Carpeggio, CarpeggioRand, CarpeggioGenerative
 
-app = Application()
+app = MidiServer()
 q = app.patchQueue
 
 #

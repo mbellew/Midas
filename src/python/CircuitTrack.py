@@ -1,10 +1,10 @@
 #!/usr/bin/python3
-from app.Application import *
-from app.Application import *
-from app.Carpeggio import CarpeggioGenerative
-from app.Rhythms import RhythmModule, CircuitTrackDrumKit
+from midi.MidiServer import *
+from midi.MidiServer import *
+from midi.Carpeggio import CarpeggioGenerative
+from midi.Rhythms import RhythmModule, CircuitTrackDrumKit
 
-app = Application()
+app = MidiServer()
 q = app.patchQueue
 
 #

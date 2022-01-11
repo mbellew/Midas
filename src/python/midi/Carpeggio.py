@@ -27,9 +27,9 @@ from random import random, randrange
 
 import mido
 
-from app.Chords import *
-from app.Event import Event, EVENT_MIDI
-from app.Module import ProgramModule
+from midi.Chords import *
+from midi.Event import Event, EVENT_MIDI
+from midi.Module import ProgramModule
 
 
 class Carpeggio(ProgramModule):
