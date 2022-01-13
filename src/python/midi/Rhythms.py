@@ -428,8 +428,9 @@ class Spark(NotesDrumKit):
 class RhythmModule(ProgramModule):
     def __init__(self, q, name, rhythm=POP1, drumkit=MpcPadsChromaticC1(), channel=9, ppq=24):
         super().__init__("Rhythms")
-        q.createSink(name + "_in",self)
-        self.cc_sink = q.createSink(name + "_cc_in",self)
+        q.createSink(name + "_in", self)
+        q.createSink(name + "_clock_in", self)
+        self.cc_sink = q.createSink(name + "_cc_in", self)
         self.ppq = ppq
         self.notes_out = q.createSource(name + "_out")
 
