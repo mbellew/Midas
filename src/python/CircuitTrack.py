@@ -27,7 +27,7 @@ app.addProgramController('Midi Fighter Twister_in', TWISTER_CONTROLLER)
 
 DebugModule(q, 'debug')
 app.addProgram(RhythmModule(q, "rhythm_clock_in", "rhythm_cc_in", "rhythm_out", drumkit=CircuitTrackDrumKit(), ppq=PPQ))
-app.addProgram(CarpeggioGenerative(q, "carpeggio_clock_in", "carpeggio_cc_in", "carpeggio_out", "carpeggio_drone", ppq=PPQ, root=48, minor=True))
+app.addProgram(CarpeggioGenerative(q, "carpeggio", ppq=PPQ, root=48, minor=True))
 
 
 # 

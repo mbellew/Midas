@@ -124,6 +124,7 @@ class HttpServer:
         return self
 
     async def async_stop(self):
+        print("HttpServer.py async_stop")
         GlobalState.stop_event.set()
         if self.site:
             await self.site.stop()

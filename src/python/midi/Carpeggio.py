@@ -33,7 +33,7 @@ from midi.Module import ProgramModule
 
 
 class Carpeggio(ProgramModule):
-    def __init__(self, q, clock_sink, cc_sink, notes_out, drone_out=None, channel=9, drone=8, ppq=48, root=36):
+    def __init__(self, q, name, channel=1, drone=8, ppq=48, root=36):
         super().__init__("Carpeggio")
         self.time = -1
         self.root = root
@@ -46,11 +46,12 @@ class Carpeggio(ProgramModule):
         self.update_chord(0)
         self.step = -1
 
-        q.createSink(clock_sink, self)
-        self.cc_sink = q.createSink(cc_sink, self)
+        q.createSink(name + "_clock_in", self)
+
+        self.cc_sink = q.createSink(name + "_cc_in", self)
         self.ppq = ppq
-        self.notes_out = q.createSource(notes_out)
-        self.drone_out = None if not drone_out else q.createSource(drone_out)
+        self.notes_out = q.createSource(name + "_out")
+        self.drone_out = q.createSource(name + "_drone")
         self.channel = channel
         self.notes_currently_on = []
         self.drone_notes = []
@@ -62,10 +63,14 @@ class Carpeggio(ProgramModule):
         return self.cc_sink
 
     def update_chord(self, measure):
-        chord = self.next_chord(measure).copy(transpose=self.root)
+        chord = self.next_chord(measure)
+        if chord is None:
+            return False
+        chord = chord.copy(transpose=self.root)
         self.arp_chord = chord.chord_shape
         self.chord_offset = chord.root
         self.current_sequence = chord.generate_sequence()
+        return True
 
     def next_step(self, pulse):
         return (self.step + 1) % 16
@@ -82,25 +87,23 @@ class Carpeggio(ProgramModule):
 
         # drone
         if self.drone_out is not None and pulse.measure:
-            if pulse.measure_num % 4 == 0:
-                self.update_chord(pulse.measure)
-            if pulse.measure_num % 4 == 0:
+            if self.update_chord(pulse.measure):
                 current_notes_on = self.drone_notes
                 self.drone_notes = []
                 legato = False
                 if not legato:
                     for off_msg in current_notes_on:
                         off_msg.time = self.time
-                        self.drone_out.add(Event(EVENT_MIDI,'carpeggio.drone',off_msg))
+                        self.drone_out.add(Event(EVENT_MIDI, 'carpeggio.drone', off_msg))
                 note = self.current_sequence[0]
                 on_msg = mido.Message('note_on', note=note, channel=self.drone_channel, time=self.time)
                 off_msg = mido.Message('note_off', note=note, channel=self.drone_channel)
                 self.drone_notes.append(off_msg)
-                self.drone_out.add(Event(EVENT_MIDI,'carpeggio.drone',on_msg))
+                self.drone_out.add(Event(EVENT_MIDI, 'carpeggio.drone', on_msg))
                 if legato:
                     for off_msg in current_notes_on:
                         off_msg.time = self.time
-                        self.drone_out.add(Event(EVENT_MIDI,'carpeggio.drone',off_msg))
+                        self.drone_out.add(Event(EVENT_MIDI, 'carpeggio.drone', off_msg))
                     self.drone_notes = []
 
         # bass motif
@@ -138,8 +141,8 @@ class Carpeggio(ProgramModule):
 
 
 class CarpeggioRand(Carpeggio):
-    def __init__(self, q, clock_sink, cc_sink, notes_out, channel=9, ppq=48):
-        super().__init__(q, clock_sink, cc_sink, notes_out, channel, ppq)
+    def __init__(self, q, name, ppq=24):
+        super().__init__(q, name, ppq=ppq)
 
 
 def rotate_word_right(w, n):
@@ -152,10 +155,13 @@ def start_of_bar(pulse):
 
 
 class CarpeggioGenerative(Carpeggio):
-    def __init__(self, q, clock_sink, cc_sink, notes_out, drone_out=None, root=36, channel=9, ppq=24, minor=False):
+    def __init__(self, q, name, root=36, ppq=24, minor=False):
         self.last_chord = -1
         self.minor = minor
-        super().__init__(q, clock_sink, cc_sink, notes_out, drone_out, root=root, channel=channel, ppq=ppq)
+        self.play_next_chord = None
+        self.last_chord_change_measure = 0
+        super().__init__(q, name, root=root, ppq=ppq)
+        q.createSink(name + "_chord_in", self.set_next_chord)
         self.seq_prob = 0.05
         self.register = int(random() * 210343859341) & 0xffff
         self.register_rotation = 0
@@ -170,11 +176,31 @@ class CarpeggioGenerative(Carpeggio):
         self.trigger_step = 0
         self.eighths = int(ppq/2)
 
+
+    def set_next_chord(self, event):
+        # set chord at start of next measure
+        # we want a number 1-7 from incoming note
+        if event.code == EVENT_MIDI:
+            msg = event.obj
+            if msg.type == 'note_on':
+                n = msg.note % 12
+                chord = 0
+                if n == 0: chord = 0    # I
+                elif n <= 2: chord = 1  # II
+                elif n <= 4: chord = 2  # III
+                elif n <= 5: chord = 3  # IV
+                elif n <= 7: chord = 4  # V
+                elif n <= 9: chord = 5  # VI
+                else: chord = 6         # VII
+                self.play_next_chord = chord
+
+
     def update_display(self):
-        self.display_area.write(0,0,"root note " + str(self.root))
-        self.display_area.write(1,0,"minor" if self.minor else "major")
+        self.display_area.write(0, 0, "root note " + str(self.root))
+        self.display_area.write(1, 0, "minor" if self.minor else "major")
         c = self.chord_offset - self.root
-        self.display_area.write(2,0,str(c))
+        self.display_area.write(2, 0, str(c))
+
 
     def trigger(self, pulse):
         if not pulse.eighth:
@@ -187,7 +213,7 @@ class CarpeggioGenerative(Carpeggio):
  
     def next_step(self, pulse):
         if start_of_bar(pulse):
-            # 'restart' sequene
+            # 'restart' sequence
             self.register_rotation = self.register_rotation % 16
             self.register = rotate_word_right(self.register, 16-self.register_rotation)
             self.register_rotation = 0
@@ -202,26 +228,33 @@ class CarpeggioGenerative(Carpeggio):
         return curr & 0x0007
 
     def next_chord(self, measure):
-        r = random()
-        if measure == 0:
+        c = None
+        if self.play_next_chord is not None:
+            c = self.play_next_chord
+        elif measure == 0:
             c = 0
-        elif r < 0.2:
-            c = 0       # I
-        elif r < 0.4:
-            c = 4       # V
-        elif r < 0.6:
-            c = 3       # IV
-        elif r < 0.7:
-            c = 1       #II
-        elif r < 0.8:
-            c = 2       #III
-        elif r < 0.9:
-            c = 5       #VI
-        else:
-            c = 6       #VII
-        if c == self.last_chord:
-            c = randrange(0,7)
-        # print("CHORD " + str(c+1))
+        elif measure - self.last_chord_change_measure >= 4:
+            r = random()
+            if r < 0.2:
+                c = 0       # I
+            elif r < 0.4:
+                c = 4       # V
+            elif r < 0.6:
+                c = 3       # IV
+            elif r < 0.7:
+                c = 1       # II
+            elif r < 0.8:
+                c = 2       # III
+            elif r < 0.9:
+                c = 5       # VI
+            else:
+                c = 6       # VII
+            if c == self.last_chord:
+                c = randrange(0, 7)
+        if c is None:
+            return None
+        self.play_next_chord = None
+        self.last_chord_change_measure = measure
         if self.minor:
             return MINOR_KEY_CHORDS[c]
         else:

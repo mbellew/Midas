@@ -110,7 +110,7 @@ class TimeKeeper:
     beat and measure counts used.  These are the messages used internally by other modules"""
     def __init__(self, q, sink, source, ppq):
         self.sig = Signature(4,4,ppq)
-        q.createSink(sink, self)
+        q.createSink(sink, self.handle)
         self.out = q.createSource(source)
         self.current_pulse = 0
 

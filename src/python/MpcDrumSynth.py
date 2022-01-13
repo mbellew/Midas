@@ -19,11 +19,11 @@ app.useExternalClock('IAC Driver Bus 1_clock')
 # MODULES
 #
 
-StrumPattern(q, 'strumpattern_in', 'strumpattern_out')
+StrumPattern(q, 'strumpattern')
 DebugModule(q, 'debug')
-m = RhythmModule(q, "rhythm_clock_in", "rhythm_cc_in", "rhythm_out", drumkit=MpcPadsChromaticMidi0(8), channel=CH10, ppq=PPQ)
+m = RhythmModule(q, "rhythm", drumkit=MpcPadsChromaticMidi0(8), channel=CH10, ppq=PPQ)
 m.instrument = [0,2,3,5]
-CarpeggioGenerative(q, "carpeggio_clock_in", "carpeggio_cc_in", "carpeggio_out", channel=CH9, drone=CH8, ppq=PPQ, minor=False)
+CarpeggioGenerative(q, "carpeggio", channel=CH9, drone=CH8, ppq=PPQ, minor=False)
 
 # 
 # PATCH!

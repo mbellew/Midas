@@ -10,21 +10,21 @@ q = app.patchQueue
 # MODULES
 #
 
-StrumPattern(q, 'strumpattern_in', 'strumpattern_out')
+StrumPattern(q, 'strumpattern')
 DebugModule(q, 'debug')
-RhythmModule(q, "rhythm_clock_in", "rhythm_cc_in", "rhythm_out", drumkit=Spark(60), channel=CH10, ppq=PPQ)
-CarpeggioGenerative(q, "carpeggio_clock_in", "carpeggio_cc_in", "carpeggio_out", channel=CH9, drone=CH8, ppq=PPQ, minor=False)
+RhythmModule(q, "rhythm", drumkit=Spark(60), channel=CH10, ppq=PPQ)
+CarpeggioGenerative(q, "carpeggio", ppq=PPQ, minor=False)
 
 # 
 # PATCH!
 #
 
 # USE THIS IF THERE IS NO EXTERNAL MIDI CLOCK
-#app.patch('internal_clock','timekeeper_in')
+# app.patch('internal_clock','timekeeper_in')
 app.patch('knobs','internal_clock_cc')
 
 # get clock from MPC over IAC Bus
-app.patch('IAC Driver Bus 1_clock','timekeeper_in')
+app.patch('IAC Driver Bus 1_clock', 'timekeeper_in')
 
 # sequencer needs clock, and supports control_change messages
 app.patch('clock','rhythm_clock_in')

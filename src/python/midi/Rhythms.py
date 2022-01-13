@@ -227,6 +227,12 @@ PRIME232 = Rhythm("PRIME232",12, """
     |x x x x x x
     |xxxxxxxxxxxx     
 """)
+BOOTSNCATS = Rhythm("BOOTSNCATS",8, """
+    |x x x x |
+    |  x   x |
+    |  x   x |
+    |  x   x |     
+""")
 
 
 class Player:
@@ -420,12 +426,12 @@ class Spark(NotesDrumKit):
 
 
 class RhythmModule(ProgramModule):
-    def __init__(self, q, clock_sink, cc_sink, notes_out, rhythm=POP1, drumkit=None, channel=9, ppq=48):
+    def __init__(self, q, name, rhythm=POP1, drumkit=MpcPadsChromaticC1(), channel=9, ppq=24):
         super().__init__("Rhythms")
-        q.createSink(clock_sink,self)
-        self.cc_sink = q.createSink(cc_sink,self)
+        q.createSink(name + "_in",self)
+        self.cc_sink = q.createSink(name + "_cc_in",self)
         self.ppq = ppq
-        self.notes_out = q.createSource(notes_out)
+        self.notes_out = q.createSource(name + "_out")
 
         self.channel = channel
         self.drumkit = drumkit if drumkit else Spark()
@@ -494,10 +500,11 @@ class RhythmModule(ProgramModule):
             self.notes_currently_on = []
         parts = self.player.next()
         for part in range(0,len(parts)):
-            v = parts[part]
-            if v > 0:
+            velocity = parts[part]
+            instrument = self.instrument[part % len(self.instrument)]
+            if velocity > 0 and instrument >= 0:
                 on_msg = self.drumkit.note_on(self.instrument[part % len(self.instrument)])
-                on_msg.velocity = v
+                on_msg.velocity = velocity
                 if self.channel is not None:
                     on_msg.channel = self.channel
                 off_msg = self.drumkit.note_off(self.instrument[part])
@@ -518,3 +525,10 @@ class RhythmModule(ProgramModule):
             off_msg.time = self.time
             self.notes_out.add(Event(EVENT_MIDI,'rhythms',off_msg))
  
+
+
+
+class BootsNCats(RhythmModule):
+    def __init__(self, q, name, rhythm=BOOTSNCATS, instruments=None, drumkit=MpcPadsChromaticC1(), ppq=24):
+        super().__init__(q, name, rhythm, drumkit, ppq=ppq)
+        self.instrument = instruments or [0,0,1,6]  # (kick),(kick,snare,clap)

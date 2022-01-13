@@ -44,7 +44,7 @@ def unique_name(s):
 
 class DebugModule:
     def __init__(self, q, sinkName,):
-        q.createSink(sinkName, self)
+        q.createSink(sinkName, self.handle)
 
     def handle(self, event):
         #if EVENT_CLOCK == event.code and event.obj.pulse > 0:
@@ -107,7 +107,7 @@ class MidiChannelFilter:
         global patch_point_unique
         if not sink_name:
             sink_name = unique_name("MidiChannelFilter_sink_")
-        self.sink = q.createSink(sink_name, self)
+        self.sink = q.createSink(sink_name, self.handle)
         if not source_name:
             source_name = unique_name("MidiChannelFilter_source_")
         self.sink_name = sink_name
@@ -163,6 +163,7 @@ class OutputChannel:
         self.passthrough = None
         self.midifilter = None
         self.sink_name = "CH" + str(channel+1)
+        self.source_name = None
         self.name = self.sink_name
         q.createSink(self.sink_name)
 
@@ -172,7 +173,9 @@ class OutputChannel:
         if name:
             self.name = name
         self.midifilter = MidiChannelFilter(self.q, None, self.channel, self.sink_name)
-        self.q.createPatch(self.midifilter.source_name, device)        
+        self.q.createPatch(self.midifilter.source_name, device)  
+        self.output_source = self.midifilter.source_name
+
 
 
 class ProgramController:
@@ -276,8 +279,7 @@ class BeatStepCustomMap(ProgramController):
                 if msg.control == 1 or msg.control == 127:
                     return self.shift(msg.value == 127)
                 return None
-                # "level" wheel on beatstep (TODO move to subclass)
-            elif msg.control == 100 and (msg.value==1 or msg.value == 127):
+            elif msg.control == 100 and (msg.value == 1 or msg.value == 127):
                 if msg.value == 127:
                     return self.program_prev()
                 else:
@@ -377,8 +379,8 @@ class MidiServer:
 
 
     def useExternalClock(self, source):
-        self.patch('internal_clock','timekeeper_in')
-        self.patch(source,'timekeeper_in')
+        self.patch('internal_clock', 'timekeeper_in')
+        self.patch(source, 'timekeeper_in')
 
 
     def update_display(self,repaint=False):
@@ -607,10 +609,15 @@ class MidiServer:
 
 
     async def loop_forever(self):
-        self.print_patch()
-        self.patchQueue.optimize()
-        while not GlobalState.stop_event.is_set():
-            await self.loop()
+        try:
+            self.print_patch()
+            self.patchQueue.optimize()
+            while not GlobalState.stop_event.is_set():
+                await self.loop()
+        except Exception as ex:
+            print("loop_forever()", ex)
+        finally:
+            print("MidiServer.loop_forever() is done is_set()==" + str(GlobalState.stop_event.is_set()))
 
 
     def stop(self):

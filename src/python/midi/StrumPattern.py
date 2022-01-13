@@ -3,9 +3,9 @@ from midi.Event import Event, EVENT_MIDI, EVENT_CLOCK
 
 
 class StrumPattern:
-    def __init__(self, q, sinkName, sourceName):
-        q.createSink(sinkName, self)
-        self.out = q.createSource(sourceName)
+    def __init__(self, q, name):
+        q.createSink(name + "_in", self)
+        self.out = q.createSource(name + "_out")
         self.current_msg = None
         self.source = None
 

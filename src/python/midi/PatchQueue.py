@@ -1,5 +1,6 @@
 from midi.DelayQueue import DelayQueue
 from midi.Event import EVENT_CLOCK
+from midi.Module import Module
 
 # we want to act more or less single threaded, dispatchEvent is a good choke-point
 # from threading import RLock
@@ -15,7 +16,10 @@ class Point:
         self.parent = queue
         self.name = name
         self.inout = inout
-        self.handler = handler
+        if handler is not None and isinstance(handler, Module):
+            self.handler = handler.handle
+        else:
+            self.handler = handler
 
     def add(self, event):
         self.parent.dispatchEvent(event, self)
@@ -42,7 +46,7 @@ class PatchQueue:
         self.listType = type((0,1))
         self.points = {}
         self.patches = {}
-        self.createSink(clock_sink,self)
+        self.createSink(clock_sink, self.handle)
         self.queue = DelayQueue()
 
 
@@ -186,11 +190,7 @@ class PatchQueue:
     def dispatchEvent(self, event, point):
         _THREAD_LOCK_ and _THREAD_LOCK_.acquire()
         if point.handler:
-            if point.handler.handle:
-                point.handler.handle(event)
-            else:
-                point.handler(event)
-
+            point.handler(event)
         if point.name in self.patches:
             points = self.patches[point.name]
             for p in points:
