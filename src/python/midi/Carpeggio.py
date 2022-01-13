@@ -87,7 +87,7 @@ class Carpeggio(ProgramModule):
 
         # drone
         if self.drone_out is not None and pulse.measure:
-            if self.update_chord(pulse.measure):
+            if self.update_chord(pulse.measure_num):
                 current_notes_on = self.drone_notes
                 self.drone_notes = []
                 legato = False
