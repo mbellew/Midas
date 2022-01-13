@@ -46,7 +46,9 @@ class Application:
         #     GlobalState.stop_event.set()
         try:
             GlobalState.webserver_task = asyncio.create_task(GlobalState.webserver.async_run())
-            await GlobalState.midiserver.loop_forever()
+            GlobalState.midiserver_task = asyncio.create_task(GlobalState.midiserver.loop_forever())
+            while not GlobalState.stop_event.is_set():
+                await asyncio.sleep(0.1)
         finally:
             print("async_run setting stop_event")
             GlobalState.stop_event.set()

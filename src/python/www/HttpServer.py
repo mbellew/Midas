@@ -24,8 +24,14 @@ class HttpServer:
             pass
         elif webdir.endswith("/www"):
             webdir = webdir + "/static"
-        else:
+        elif webdir.endswith("/python"):
             webdir = webdir + "/www/static"
+        elif webdir.endswith("/src"):
+            webdir = webdir + "python/www/static"
+        else:
+             webdir = webdir + "/src/python/www/static"
+        if not os.path.exists(webdir + "/index.html"):
+            print("**** webserver files not found ****")
         self.webdir = webdir
         self.message = ' pong '
         # BUGBUG learn how asyncio signalling works!
@@ -43,6 +49,7 @@ class HttpServer:
         self.runner = web.AppRunner(self.app)
         await self.runner.setup()
         self.site = web.TCPSite(self.runner, self.hostName, self.serverPort)
+        print("starting server http://" + self.hostName + ":" + str(self.serverPort))
         await self.site.start()
 
 
@@ -61,20 +68,20 @@ class HttpServer:
             return web.FileResponse(os_path)
 
 
-    async def websocket_handler_poll(self, request):
-        ws = web.WebSocketResponse()
-        await ws.prepare(request)
-        async for msg in ws:
-            if msg.type == aiohttp.WSMsgType.TEXT:
-                for i in range(0, 5):
-                    if msg.data == 'ping' or self.message_changed:
-                        break
-                    await asyncio.sleep(0.2)
-                await ws.send_str(self.message)
-                self.message_changed = False
-            elif msg.type == aiohttp.WSMsgType.ERROR:
-                print('ws connection closed with exception %s' % ws.exception())
-        return ws
+    # async def websocket_handler_poll(self, request):
+    #     ws = web.WebSocketResponse()
+    #     await ws.prepare(request)
+    #     async for msg in ws:
+    #         if msg.type == aiohttp.WSMsgType.TEXT:
+    #             for i in range(0, 5):
+    #                 if msg.data == 'ping' or self.message_changed:
+    #                     break
+    #                 await asyncio.sleep(0.2)
+    #             await ws.send_str(self.message)
+    #             self.message_changed = False
+    #         elif msg.type == aiohttp.WSMsgType.ERROR:
+    #             print('ws connection closed with exception %s' % ws.exception())
+    #     return ws
 
     # async def websocket_handler_event(self, request):
     #     ws = web.WebSocketResponse()
@@ -116,12 +123,12 @@ class HttpServer:
         return await self.websocket_handler_cond(request)
 
 
-    def run_in_background(self, loop):
-        if not self.thread:
-            self.loop = loop
-            self.thread = threading.Thread(target=lambda: self.run())
-            self.thread.start()
-        return self
+    # def run_in_background(self, loop):
+    #     if not self.thread:
+    #         self.loop = loop
+    #         self.thread = threading.Thread(target=lambda: self.run())
+    #         self.thread.start()
+    #     return self
 
     async def async_stop(self):
         print("HttpServer.py async_stop")
@@ -167,19 +174,6 @@ class HttpServer:
                 self.new_message_condition.notify_all()
         finally:
             self.new_message_condition.release()
-
-
-# ## testing
-#
-#
-# def main_stop(server):
-#     GlobalState.stop_event.set()
-#     asyncio.run(server.async_stop())
-#
-#
-# async def main_start(server):
-#     # asyncio.create_task(server.start_server())
-#     asyncio.get_event_loop().run_until_complete(server.start_server())
 
 
 if __name__ == "__main__":
