@@ -9,14 +9,14 @@ Rhythm_array = []
  
 class Rhythm:
 
-    def __init__(self, name, count, str):
+    def __init__(self, name, count, rhythm_str, parts=4):
         global Rhythm_array
         self.display_area = None
         self.name = name
         self.count = count
         self.parts = []
-        str = str.lower()
-        arr = str.split("\n")
+        rhythm_str = rhythm_str.lower()
+        arr = rhythm_str.split("\n")
         for s in arr:
             s = s.strip().replace("_",".").replace(' ',".")
             if len(s) == 0:
@@ -30,8 +30,8 @@ class Rhythm:
             if len(s) != count:
                 raise Exception("BAD")
             self.parts.append(s)
-        if len(self.parts) != 4:
-            raise Exception("BAD")
+        if len(self.parts) != parts:
+            raise Exception("expected " + str(parts) + " parts, found " + str(len(self.parts)))
         Rhythm_array.append(self)
 
     @staticmethod
@@ -227,25 +227,40 @@ PRIME232 = Rhythm("PRIME232",12, """
     |x x x x x x
     |xxxxxxxxxxxx     
 """)
-BOOTSNCATS = Rhythm("BOOTSNCATS",8, """
-    |x x x x |
-    |  x   x |
-    |  x   x |
-    |  x   x |     
-""")
+
+BOOTSNCATS = Rhythm("BOOTSNCATS",8, 
+    "|x       |\n" +  # KICK 1
+    "|    x   |\n" +  # KICK 2 (can be same as KICK1)
+    "|    x   |\n" +  # SNARE
+    "|    x   |\n" +  # REINFORCEMENT
+    "|  xx  x |\n" +  # HAT
+    "|x x x x |",      # TICKTICKTICK
+    parts=6
+)
+# TODO for end of bar/section
+BOOTSNCATS_ACCENT = Rhythm("BOOTSNCATS",8, 
+    "|x       |\n" +  # KICK 1
+    "|    x   |\n" +  # KICK 2 (can be same as KICK1)
+    "|    x   |\n" +  # SNARE
+    "|    x   |\n" +  # REINFORCEMENT
+    "|  xx  x |\n" +  # HAT
+    "|x x x x |",      # TICKTICKTICK
+    parts=6
+)
 
 
 class Player:
     def __init__(self,rhythm):
         self.rhythm = rhythm
-        self.offsets = [0,0,0,0]
-        self.probability = [1,1,1,1]
+        self.offsets = [0] * len(rhythm.parts)
+        self.probability = [1]  * len(rhythm.parts)
         self.time = 0
 
     # returns a 4 element array with velocities
     def next(self):
-        ret = [0,0,0,0]
-        for i in range(0,4):
+        count = len(self.rhythm.parts)
+        ret = [0] * count
+        for i in range(0,count):
             t = (self.time + self.offsets[i]) % self.rhythm.count
             ch = self.rhythm.parts[i][t]
             if ch == '.':
@@ -257,7 +272,7 @@ class Player:
         return ret
 
     def update_display(self, area):
-        for i in range(0,4):
+        for i in range(0,len(self.rhythm.parts)):
             off = self.offsets[i] % self.rhythm.count
             pattern = self.rhythm.parts[i]
             area.write(i,0,pattern[off:] + pattern[0:off])
@@ -428,11 +443,19 @@ class Spark(NotesDrumKit):
 class RhythmModule(ProgramModule):
     def __init__(self, q, name, rhythm=POP1, drumkit=MpcPadsChromaticC1(), channel=9, ppq=24):
         super().__init__("Rhythms")
+        self.double_time = False
         q.createSink(name + "_in", self)
         q.createSink(name + "_clock_in", self)
         self.cc_sink = q.createSink(name + "_cc_in", self)
         self.ppq = ppq
         self.notes_out = q.createSource(name + "_out")
+        # OUTPUT note_on events to act as gate, DOES NOT SEND note_off
+        self.trigger_out = [
+            q.createSource(name + "_trigger1"),
+            q.createSource(name + "_trigger2"),
+            q.createSource(name + "_trigger3"),
+            q.createSource(name + "_trigger4")
+        ]
 
         self.channel = channel
         self.drumkit = drumkit if drumkit else Spark()
@@ -493,7 +516,8 @@ class RhythmModule(ProgramModule):
             #print(self.instrument)
 
     def handle_clock(self, pulse):
-        if not pulse.eighth:
+        trigger = self.double_time and pulse.sixteenth or pulse.eighth
+        if not trigger:
             return
         for off_msg in self.notes_currently_on:
             off_msg.time = self.time
@@ -513,7 +537,10 @@ class RhythmModule(ProgramModule):
                     off_msg.channel = self.channel
                 self.notes_currently_on.append(off_msg)
                 on_msg.time = self.time
-                self.notes_out.add(Event(EVENT_MIDI,'rhythms',on_msg))
+                evt = Event(EVENT_MIDI,'rhythms',on_msg)
+                self.notes_out.add(evt)
+                if part < 4:
+                    self.trigger_out[part].add(evt)
  
     def handle_stop(self):
         for off_msg in self.notes_currently_on:
@@ -528,8 +555,23 @@ class RhythmModule(ProgramModule):
  
 
 
-
 class BootsNCats(RhythmModule):
-    def __init__(self, q, name, rhythm=BOOTSNCATS, instruments=None, drumkit=MpcPadsChromaticC1(), ppq=24):
-        super().__init__(q, name, rhythm, drumkit, ppq=ppq)
-        self.instrument = instruments or [0,0,1,6]  # (kick),(kick,snare,clap)
+     def __init__(self, q, name, rhythm=BOOTSNCATS, instruments=None, drumkit=MpcPadsChromaticC1(), ppq=24):
+         super().__init__(q, name, rhythm, drumkit, ppq=ppq)
+         self.double_time = True
+         if instruments is None:
+            if isinstance(drumkit,VolcaBeats):
+                instruments = [0, 0, 1, 6, 4, 7]  # KICK, KICK, SNARE, CLAP, CL HAT, CLAVE
+            else:
+                instruments = [1, 2, 3, 4, 5, 6]
+         self.instrument = instruments
+
+
+# BOOTSNCATS = Rhythm("BOOTSNCATS",8, 
+#     "|x       |\n" +  # KICK 1
+#     "|    x   |\n" +  # KICK 2 (can be same as KICK1)
+#     "|    x   |\n" +  # SNARE
+#     "|    x   |\n" +  # REINFORCEMENT
+#     "|  xx  x |\n" +  # HAT
+#     "|x x x x |"      # TICKTICKTICK
+#     )

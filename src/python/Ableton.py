@@ -24,14 +24,14 @@ app.useExternalClock('IAC Driver Bus 1_clock')
 
 app.addProgramController('Arturia BeatStep_in', BEATSTEP_CONTROLLER)
 app.addProgramController('Midi Fighter Twister_in', TWISTER_CONTROLLER)
-app.addProgramController('MIDI Mix_in', AKAIMIDIMIX_CONTROLLER)
+# use MidiMix for Ableton app.addProgramController('MIDI Mix_in', AKAIMIDIMIX_CONTROLLER)
 
 DebugModule(q, 'debug')
 rm = RhythmModule(q, "rhythm", drumkit=MpcPadsChromaticC1(16), ppq=PPQ)
 rm.instrument = [3, 8, 10, 11]
 app.addProgram(rm)
 bc = BootsNCats(q, "bootsncats", drumkit=MpcPadsChromaticC1(16), ppq=PPQ)
-bc.instrument = [0, 1, 2, 12]
+bc.instrument = [0, 1, 2, 3, 6, 12] # kick, kick, snare, clap, 
 app.addProgram(CarpeggioGenerative(q, "carpeggio", ppq=PPQ, root=48, minor=True))
    
 
@@ -63,7 +63,9 @@ app.patch('carpeggio_out', arpOut)
 app.patch('carpeggio_drone', droneOut)   
 
 # app.patch('Arturia BeatStep_in', 'debug')
+app.patch(app.getOutputChannel(CH8).output_source, 'debug')
 app.patch(app.getOutputChannel(CH9).output_source, 'debug')
 app.patch(app.getOutputChannel(CH10).output_source, 'debug')
+app.patch("rhythm_trigger1", 'debug')
 
 Application.run()

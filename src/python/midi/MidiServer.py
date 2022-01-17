@@ -137,7 +137,7 @@ class PassthroughModule:
     def __init__(self, q, source_name, sink_name=None):
         if not sink_name:
             sink_name = unique_name("passthrough_")
-        self.sink = q.createSink(sink_name, self)
+        self.sink = q.createSink(sink_name, self.handle)
         self.source_name = source_name
         self.output_point = q.createSource(self.source_name)
         self.isPassthroughModule = True
@@ -329,9 +329,9 @@ class MidiServer:
         self.current_program = 0
         self.current_program_sink = None
         self.controller_sink = {
-            BEATSTEP_CONTROLLER: self.sink("controller_bs_sink", BeatStepCustomMap(self)),
-            TWISTER_CONTROLLER: self.sink("controller_tw_sink", FighterTwister(self)),
-            AKAIMIDIMIX_CONTROLLER: self.sink("controller_mm_sink", AkaiMidiMix(self))}
+            BEATSTEP_CONTROLLER: self.sink("controller_bs_sink", BeatStepCustomMap(self).handle),
+            TWISTER_CONTROLLER: self.sink("controller_tw_sink", FighterTwister(self).handle),
+            AKAIMIDIMIX_CONTROLLER: self.sink("controller_mm_sink", AkaiMidiMix(self).handle)}
 
         self.repaint = True
 
@@ -379,7 +379,6 @@ class MidiServer:
 
 
     def useExternalClock(self, source):
-        self.patch('internal_clock', 'timekeeper_in')
         self.patch(source, 'timekeeper_in')
 
 
