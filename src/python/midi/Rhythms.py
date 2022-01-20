@@ -2,6 +2,7 @@ import random
 
 import mido
 
+from midi.Euclidian import densifier
 from midi.Event import *
 from midi.Module import ProgramModule
 
@@ -9,12 +10,16 @@ Rhythm_array = []
  
 class Rhythm:
 
-    def __init__(self, name, count, rhythm_str, parts=4):
+    def __init__(self):
+        self.name = None
+        self.count = 0
+        self.parts = []
+
+
+    def init(self, name, count, rhythm_str, parts=4):
         global Rhythm_array
-        self.display_area = None
         self.name = name
         self.count = count
-        self.parts = []
         rhythm_str = rhythm_str.lower()
         arr = rhythm_str.split("\n")
         for s in arr:
@@ -34,6 +39,23 @@ class Rhythm:
             raise Exception("expected " + str(parts) + " parts, found " + str(len(self.parts)))
         Rhythm_array.append(self)
 
+
+    @staticmethod
+    def create(name, count, rhythm_str, parts=4):
+        r = Rhythm()
+        r.init(name,count,rhythm_str,parts)
+        return r
+
+
+    @staticmethod
+    def copy(from_):
+        ret = Rhythm()
+        ret.name = from_.name
+        ret.count = from_.count
+        ret.parts = from_.parts.copy()
+        return ret
+        
+
     @staticmethod
     def count():
         return len(Rhythm_array)
@@ -47,188 +69,188 @@ class Rhythm:
             print(p)
         return
 
-MOTORIK1 = Rhythm("MOTORIK1",32,"""
+MOTORIK1 = Rhythm.create("MOTORIK1",32,"""
     |X xx      xx    X xx      xx    |
     |x   x   x   x   x x x    x  x x |
     |    x xx    x xx    x xx    x xx|
     |x   x   x   x   x   x   x   x   |
 """)
-MOTORIK2 = Rhythm("MOTORIK2",32,"""
+MOTORIK2 = Rhythm.create("MOTORIK2",32,"""
     |X x x x x x x x X x x x x x x x |
     |    x       x       x       x  x|
     |x x   x x x   x x x   x x x     |
     |x   x   x   x   x   x   x   x   |
 """)
-MOTORIK3 = Rhythm("MOTORIK3",32,"""
+MOTORIK3 = Rhythm.create("MOTORIK3",32,"""
     |Xx      x x     Xx      x x     |
     |    x       x       x       x x |
     |x xxx  xx xxx  xx xxx  xx xxx  x|
     |x       x x   x x               |
 """)
-POP1 = Rhythm("POP1",32,"""
+POP1 = Rhythm.create("POP1",32,"""
     |X   x   x   x   X   x   x   x x |
     |  x  x  x xx      x  x  x xx  x |
     |    x       x       x       x  x|
     |x x x x x x x x x x x x x x x xx| 
 """)
-POP2=Rhythm("POP2",32,"""
+POP2=Rhythm.create("POP2",32,"""
     |  x x xxx x   xxx x   xxx x   x |
     |  x x xxx x   xxx x   xxx x   x |
     |    x       x       x       x   |
     |    x       x       x       x   |
 """)
-POP3 = Rhythm("POP3",32,"""
+POP3 = Rhythm.create("POP3",32,"""
     |X x xxxxx x   xxX x   xxx x x   |
     |x x xxxxx x   xxx x   xxx x x   |
     |        x x     x x     x x   x |
     |        x x     x x     x x   x |
 """)
-POP4 = Rhythm("POP4",32,"""
+POP4 = Rhythm.create("POP4",32,"""
     |X xx xx     xxxxX xx xx     xxxx|
     |x xx xx     xxxxx xx xx     xxxx|
     |xxxxx x   x xxxxx x   xxx x xx  |
     |xxxxx x   x xxxxx x   xxx x xx  |
 """)
-FUNK1 = Rhythm("FUNK1",16,"""
+FUNK1 = Rhythm.create("FUNK1",16,"""
     |X  x x  x  x x  |
     |  x   x   x   x |
     | x x x x x x x x|
     | x   x   x   xxx|
 """)
-FUNK2 = Rhythm("FUNK2",16,"""
+FUNK2 = Rhythm.create("FUNK2",16,"""
     |..x...x...x...x.
     |x xx xxxx x  xxx
     | x x x x x x x x
     | x   x   x   xxx
 """)
-FUNK3 = Rhythm("FUNK3",16,"""
+FUNK3 = Rhythm.create("FUNK3",16,"""
     |X xx xxxx x  xxx
     |x  xx  xx  xx x 
     | x x x x x x x x 
     | x   x   x   xxx
 """)
-FUNK4 = Rhythm("FUNK4",16,"""
+FUNK4 = Rhythm.create("FUNK4",16,"""
     |X  xx  xX  xx x.| 
     |x  x x  x  x x..|
     | x x x x x x x x|
     | x   x   x   xxx|
 """)
-POST = Rhythm("POST",20,"""
+POST = Rhythm.create("POST",20,"""
     |x..x.x.xxx..x.x.x.x.|
     |x        x          |
     |   x        x x x x |
     |x   x   x   x   x   |
 """)
-SEQUENCE = Rhythm("SEQUENCE",4,"""
+SEQUENCE = Rhythm.create("SEQUENCE",4,"""
     |x   |
     | x  |
     |  x |
     |   x|
 """)
-KING1 = Rhythm("KING1",12,"""
+KING1 = Rhythm.create("KING1",12,"""
     |x x xx x x x|
     |x x xx x x x|
     |x xx x  xx  |
     |x xx x  xx  |
 """)
-KING2 = Rhythm("KING2",12,"""
+KING2 = Rhythm.create("KING2",12,"""
     |x xx x  xx  |
     |x xx x   x  |
     |x x xx x x x|
     |x x xx x x x|
 """)
-KROBOTO = Rhythm("KROBOTO",12,"""
+KROBOTO = Rhythm.create("KROBOTO",12,"""
     |  x xx  x xx|
     |  x xx  x xx|
     |x     x  x  |
     |x x xx x x x|  
 """)
-VODOU1 = Rhythm("VODOU1",12,"""
+VODOU1 = Rhythm.create("VODOU1",12,"""
     |x x x xx x x|
     |x x x xx x x|
     |x     x  x  |
     |    xx    xx|
 """)
-VODOU2 = Rhythm("VODOU2",12, """
+VODOU2 = Rhythm.create("VODOU2",12, """
     | xx xx xx xx|
     | xx xx xx xx|
     |x x x xx x x|
     |    xx    xx|
 """)
-VODOU3 = Rhythm("VODOU3",12, """
+VODOU3 = Rhythm.create("VODOU3",12, """
     |x     x  x  |
     |x     x  x  |
     | xx xx xx xx|
     |    xx    xx|
 """)
-GAHU = Rhythm("GAHU",16, """
+GAHU = Rhythm.create("GAHU",16, """
     |Xx x x x x x x  |
     |xx x x x x x x  |
     |x  . . . . . .  |
     |x  x   x   x x  |
 """)
-CLAVE = Rhythm("CLAVE",16, """
+CLAVE = Rhythm.create("CLAVE",16, """
     |X  x  x   x x   |
     |x  x  x   x x   |
     |x xx x xx x xx x|
     |  xx  xx  x   xx|
 """)
-RHUMBA = Rhythm("RHUMBA",16, """
+RHUMBA = Rhythm.create("RHUMBA",16, """
     |X__x___x__x_x___
     |x__x___x__x_x___
     |x_xx_x_xx_x_xx_x
     |__xx__xx__x___xx
 """)
-JHAPTAL1 = Rhythm("JHAPTAL1",10, """
+JHAPTAL1 = Rhythm.create("JHAPTAL1",10, """
     |_x__xxx__x
     |_x__xxx__x
     |x_xx___xx_
     |x____x____
 """)
-JHAPTAL2 = Rhythm("JHAPTAL2",10, """
+JHAPTAL2 = Rhythm.create("JHAPTAL2",10, """
     |x_________
     |x_xx___xx_
     |x_xx___xx_
     |x____x____
 """)
-CHACHAR = Rhythm("CHACHAR",32,"""
+CHACHAR = Rhythm.create("CHACHAR",32,"""
     |X_______________x_______________
     |x_______x_x_____x_______x_x_____
     |____x_______x_______x_______x___
     |______________________________xx
 """)
-MATA = Rhythm("MATA",18,"""
+MATA = Rhythm.create("MATA",18,"""
     |x_________________
     |x___x_x_____x__x__
     |x___x_x_____xx_x_x
     |________x_____x__x
 """)
-PASHTO = Rhythm("PASHTO",14, """
+PASHTO = Rhythm.create("PASHTO",14, """
     |x_____________
     |____xx______x_
     |____xx______x_
     |x_____x___x___
 """)
-PRIME2 = Rhythm("PRIME2",8,"""
+PRIME2 = Rhythm.create("PRIME2",8,"""
     |x
     |x   x
     |x x x x
     |xxxxxxxx
 """)
-PRIME322 = Rhythm("PRIME322",12,"""
+PRIME322 = Rhythm.create("PRIME322",12,"""
     |x
     |x     x
     |x  x  x  x
     |xxxxxxxxxxxx
 """)
-PRIME232 = Rhythm("PRIME232",12, """
+PRIME232 = Rhythm.create("PRIME232",12, """
     |x
     |x     x
     |x x x x x x
     |xxxxxxxxxxxx     
 """)
 
-BOOTSNCATS = Rhythm("BOOTSNCATS",8, 
+BOOTSNCATS = Rhythm.create("BOOTSNCATS",8, 
     "|x       |\n" +  # KICK 1
     "|    x   |\n" +  # KICK 2 (can be same as KICK1)
     "|    x   |\n" +  # SNARE
@@ -238,7 +260,7 @@ BOOTSNCATS = Rhythm("BOOTSNCATS",8,
     parts=6
 )
 # TODO for end of bar/section
-BOOTSNCATS_ACCENT = Rhythm("BOOTSNCATS",8, 
+BOOTSNCATS_ACCENT = Rhythm.create("BOOTSNCATS",8, 
     "|x       |\n" +  # KICK 1
     "|    x   |\n" +  # KICK 2 (can be same as KICK1)
     "|    x   |\n" +  # SNARE
@@ -263,7 +285,7 @@ class Player:
         for i in range(0,count):
             t = (self.time + self.offsets[i]) % self.rhythm.count
             ch = self.rhythm.parts[i][t]
-            if ch == '.':
+            if ch == '.' or ch ==' ':
                 continue
             if self.probability[i] < 1 and random.random() > self.probability[i]:
                 continue
@@ -443,6 +465,8 @@ class Spark(NotesDrumKit):
 class RhythmModule(ProgramModule):
     def __init__(self, q, name, rhythm=POP1, drumkit=MpcPadsChromaticC1(), channel=9, ppq=24):
         super().__init__("Rhythms")
+        self.current_rhythm = rhythm
+        self.density_patterns = [None, None, None, None]
         self.double_time = False
         q.createSink(name + "_in", self)
         q.createSink(name + "_clock_in", self)
@@ -462,20 +486,27 @@ class RhythmModule(ProgramModule):
         self.instrument = [0,1,2,3]
         self.notes_currently_on = []
 
-        self.player = Player(rhythm)
+        self.player = Player(Rhythm.copy(rhythm))
         print(self.player.rhythm.name)
         self.ccmap.add( 0, lambda m : self.cc_rhythm(m))
         self.ccmap.add( 4, lambda m : self.cc_offset(m,1))
         self.ccmap.add( 8, lambda m : self.cc_offset(m,2))
         self.ccmap.add(12, lambda m : self.cc_offset(m,3))
+
         self.ccmap.add( 1, lambda m : self.cc_prob(m,0))
         self.ccmap.add( 5, lambda m : self.cc_prob(m,1))
         self.ccmap.add( 9, lambda m : self.cc_prob(m,2))
         self.ccmap.add(13, lambda m : self.cc_prob(m,3))
+
         self.ccmap.add( 2, lambda m : self.cc_instrument(m,0))
         self.ccmap.add( 6, lambda m : self.cc_instrument(m,1))
         self.ccmap.add(10, lambda m : self.cc_instrument(m,2))
         self.ccmap.add(14, lambda m : self.cc_instrument(m,3))
+
+        self.ccmap.add( 3, lambda m : self.cc_density(m, 0))
+        self.ccmap.add( 7, lambda m : self.cc_density(m, 1))
+        self.ccmap.add(11, lambda m : self.cc_density(m, 2))
+        self.ccmap.add(15, lambda m : self.cc_density(m, 3))
 
     def get_control_sink(self):
         return self.cc_sink
@@ -491,13 +522,15 @@ class RhythmModule(ProgramModule):
     def cc_rhythm(self, msg):
         r = int((msg.value/128.0) * Rhythm.count())
         rhythm = Rhythm.get(r)
-        if  self.player.rhythm != rhythm:
-            self.player.rhythm = rhythm
+        if  self.current_rhythm != rhythm:
+            self.density_patterns = [None, None, None, None]
+            self.current_rhythm = rhythm
+            self.player.rhythm = Rhythm.copy(rhythm)
             self.update_display()
 
     def cc_offset(self, msg, ch):
-        count = self.player.rhythm.count
-        offset = int((1.0-msg.value/128.0) * count)
+        rhythm_length = self.player.rhythm.count
+        offset = int((1.0-msg.value/128.0) * rhythm_length)
         if self.player.offsets[ch] != offset:
             self.player.offsets[ch] = offset
             self.update_display()
@@ -514,6 +547,22 @@ class RhythmModule(ProgramModule):
             self.instrument[ch] = i
             self.update_display()
             #print(self.instrument)
+
+    def cc_density(self, msg, ch):
+        if ch >= len(self.current_rhythm.parts):
+            return
+        rhythm_length = self.player.rhythm.count
+        density = round((msg.value/127.0) * rhythm_length)
+        # this is why we copy the rhythm, we hack it up here
+        if not self.density_patterns[ch]:
+            self.density_patterns[ch] = densifier(self.current_rhythm.parts[ch])
+            print(self.current_rhythm.parts[ch].upper())
+            print('\n'.join(self.density_patterns[ch]))
+        arr = self.density_patterns[ch]
+        new_str = arr[density]
+        self.player.rhythm.parts[ch] = new_str
+        self.update_display()
+
 
     def handle_clock(self, pulse):
         trigger = self.double_time and pulse.sixteenth or pulse.eighth
@@ -567,7 +616,7 @@ class BootsNCats(RhythmModule):
          self.instrument = instruments
 
 
-# BOOTSNCATS = Rhythm("BOOTSNCATS",8, 
+# BOOTSNCATS = Rhythm.create("BOOTSNCATS",8, 
 #     "|x       |\n" +  # KICK 1
 #     "|    x   |\n" +  # KICK 2 (can be same as KICK1)
 #     "|    x   |\n" +  # SNARE
