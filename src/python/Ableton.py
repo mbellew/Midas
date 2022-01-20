@@ -34,7 +34,7 @@ app.addProgram(rm)
 bc = BootsNCats(q, "bootsncats", drumkit=MpcPadsChromaticC1(16))
 bc.instrument = [0, 1, 2, 3, 6, 12] # kick, kick, snare, clap, 
 app.addProgram(ChordyModule(q, "chordy", root=48, minor=True))
-OneNoteSequencer(q, "bass")
+OneNoteSequencer(q, "bass", transpose=-12)
 OneNoteSequencer(q, "drone")
 
 # 
