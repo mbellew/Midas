@@ -54,10 +54,11 @@ class ChordySequencer(Sequencer):
         self.root = root
         self.last_chord = -1
         self.minor = minor
-        self.chord_offset = 0
+        self.chord_offset = self.root
         self.play_next_chord = None
         self.last_chord_change_measure = 0
         q.createSink(name + "_chord_in", self.handle_chord_in)
+        self.root_note_source = q.createSource(name + "_root")
         self.seq_prob = 0.05
         self.register = int(random() * 210343859341) & 0xffff
         self.register_rotation = 0
@@ -93,12 +94,15 @@ class ChordySequencer(Sequencer):
 
     def handle_clock(self, pulse):
         super().handle_clock(pulse)
+
         # handle chord changes
         if pulse.measure:
             chord = self.next_chord(pulse.measure_num)
             if chord:
                 self.set_notes(chord.generate_sequence(16,2))
                 self.chord_offset = chord.root
+                # TODO should probably send note_off for this even though right now it's not going straint to a midi output
+                self.root_note_source.add(Event(EVENT_MIDI, self.name, mido.Message('note_on', note=chord.root)))
 
         # handle note triggers
         if self.external_trigger_seen:

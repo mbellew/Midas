@@ -3,7 +3,7 @@ from midi.MidiServer import *
 from midi.Carpeggio import CarpeggioGenerative
 from midi.Rhythms import RhythmModule, VolcaBeats, MpcPadsChromaticC1
 from midi.ChordySequencer import ChordyModule
-
+from midi.OneNoteSequencer import OneNoteSequencer
 
 app = Application.create()
 q = app.patchQueue
@@ -34,7 +34,8 @@ app.addProgram(rm)
 bc = BootsNCats(q, "bootsncats", drumkit=MpcPadsChromaticC1(16))
 bc.instrument = [0, 1, 2, 3, 6, 12] # kick, kick, snare, clap, 
 app.addProgram(ChordyModule(q, "chordy", root=48, minor=True))
-   
+OneNoteSequencer(q, "bass")
+OneNoteSequencer(q, "drone")
 
 # 
 # Configure OUTPUT channels
@@ -46,6 +47,7 @@ bootsOut = app.setupOutputChannel(CH5, output_device, name="BOOTS")
 droneOut = app.setupOutputChannel(CH8, output_device, name="DRONE")
 arpOut = app.setupOutputChannel(CH9, output_device, name="ARP")
 drumOut = app.setupOutputChannel(CH10, output_device, name="DRUMS")
+bassOut = app.setupOutputChannel(CH7, output_device, name="BASS")
 
 #
 # PATCH!
@@ -62,11 +64,22 @@ app.patch('clock', 'chordy_clock_in')
 app.patch("Artiphon Orba MIDI_in", 'chordy_chord_in')
 app.patch('rhythm_trigger1', 'chordy_trigger')
 app.patch('chordy_out', arpOut)
-app.patch('chordy_drone', droneOut)
+#app.patch('chordy_drone', droneOut) # TODO use OneNoteSequencer
+
+# chordy will set the note for bassline
+# rhythm will be the trigger
+app.patch('chordy_root', 'bass_note_in')
+app.patch('rhythm_trigger2', 'bass_trigger')
+app.patch('bass_out', bassOut)
+
+app.patch('chordy_root', 'drone_note_in')
+app.patch('chordy_root', 'drone_trigger')
+app.patch('drone_out', droneOut)
+
 
 # app.patch('Arturia BeatStep_in', 'debug')
 #app.patch(app.getOutputChannel(CH8).output_source, 'debug')
-app.patch(app.getOutputChannel(CH9).output_source, 'debug')
+app.patch(app.getOutputChannel(CH7).output_source, 'debug')
 #app.patch(app.getOutputChannel(CH10).output_source, 'debug')
 app.patch("Artiphon Orba MIDI_in", 'debug')
 
