@@ -57,6 +57,9 @@ class Chord:
     def copy(self, transpose=0):
         return Chord(self.chord_shape, self.root+transpose)
 
+    def length(self):
+        return self.chord_shape.nr_notes
+
     def generate_sequence(self, sequence=16, octaves=2):
         return self.chord_shape.generate_sequence(self.root, sequence, octaves)
 

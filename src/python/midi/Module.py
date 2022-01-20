@@ -13,9 +13,11 @@ class AbstractModule(Module):
         self.display_area = DisplayArea.screen(0,0) # allocate a do-nothing display
         self.ccmap = MidiMap()
         self.time = -1
+        self.pulse = None
 
     def handle(self, event):
         if event.code == EVENT_CLOCK:
+            self.pulse = event.obj
             self.time = event.obj.time
             self.handle_clock(event.obj)
         elif event.code == EVENT_MIDI:
@@ -23,6 +25,7 @@ class AbstractModule(Module):
         elif event.code == EVENT_STOP:
             self.handle_stop()
             self.time = -1
+            self.pulse = None
 
     def handle_midi(self, msg):
         if msg.type == 'control_change':

@@ -2,6 +2,7 @@ from datetime import datetime
 import mido
 from midi.Event import Event, EVENT_CLOCK, EVENT_MIDI, EVENT_STOP
 from midi.MidiMap import MidiMap
+from midi.GlobalState import GlobalState
 
 
 class InternalClock:
@@ -120,7 +121,9 @@ class TimeKeeper:
         msg = event.obj
         if msg.type == 'clock':
             msg.time = self.current_pulse
-            self.out.add(Event(EVENT_CLOCK, event.source+'/timekeeper', Pulse(msg,self.sig)))
+            pulse = Pulse(msg,self.sig)
+            GlobalState.pulse = pulse
+            self.out.add(Event(EVENT_CLOCK, event.source+'/timekeeper', pulse))
             self.current_pulse = self.current_pulse + 1
 
         elif msg.type == 'stop':

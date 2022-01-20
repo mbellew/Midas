@@ -35,7 +35,6 @@ from midi.Module import ProgramModule
 class Carpeggio(ProgramModule):
     def __init__(self, q, name, channel=1, drone=8, ppq=48, root=36):
         super().__init__("Carpeggio")
-        self.time = -1
         self.root = root
         self.drone_channel = drone
         self.note_prob = 0.92

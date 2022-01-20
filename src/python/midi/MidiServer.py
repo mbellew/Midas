@@ -123,7 +123,7 @@ class MidiChannelFilter:
         msg = event.obj
         if msg.type != 'note_on' and msg.type != 'note_off':
             return
-        if not msg.channel:
+        if msg.channel is None:
             return
         if self.in_channel is not None and msg.channel != self.in_channel:
             return
@@ -313,6 +313,7 @@ class MidiServer:
 
     def __init__(self):
         global PPQ
+        GlobalState.PPQ = PPQ
         self.webserver = None
         self.screen = DisplayArea.screen(25, 80)
         self.screen.dirty = True

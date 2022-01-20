@@ -8,6 +8,8 @@ class _GlobalState:
         self.webserver_task = None
         self.midiserver = None
         self.midiserver_task = None
+        self.PPQ = 24
+        self.pulse = None
 
 
 GlobalState = _GlobalState()
