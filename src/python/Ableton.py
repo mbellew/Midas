@@ -33,7 +33,7 @@ rm.instrument = [3, 8, 10, 11]
 app.addProgram(rm)
 bc = BootsNCats(q, "bootsncats", drumkit=MpcPadsChromaticC1(16))
 bc.instrument = [0, 1, 2, 3, 6, 12] # kick, kick, snare, clap, 
-app.addProgram(ChordyModule(q, "chordy", root=48, minor=True))
+app.addProgram(ChordyModule(q, "chordy", root=48, minor=False))
 OneNoteSequencer(q, "bass", transpose=-12)
 OneNoteSequencer(q, "drone")
 
@@ -62,6 +62,7 @@ app.patch('bootsncats_out', bootsOut)
 # sequencer needs clock, and supports control_change messages
 app.patch('clock', 'chordy_clock_in')
 app.patch("Artiphon Orba MIDI_in", 'chordy_chord_in')
+app.patch("Artiphon Orba Bluetooth_in", 'chordy_chord_in')
 app.patch('rhythm_trigger1', 'chordy_trigger')
 app.patch('chordy_out', arpOut)
 #app.patch('chordy_drone', droneOut) # TODO use OneNoteSequencer
@@ -79,7 +80,7 @@ app.patch('drone_out', droneOut)
 
 # app.patch('Arturia BeatStep_in', 'debug')
 #app.patch(app.getOutputChannel(CH8).output_source, 'debug')
-app.patch(app.getOutputChannel(CH7).output_source, 'debug')
+#app.patch(app.getOutputChannel(CH7).output_source, 'debug')
 #app.patch(app.getOutputChannel(CH10).output_source, 'debug')
 app.patch("Artiphon Orba MIDI_in", 'debug')
 

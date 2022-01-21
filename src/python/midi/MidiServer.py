@@ -67,11 +67,17 @@ class DebugSendNotes:
 class MidiInputStep:
     def __init__(self, q, port_name, point, clock=None):
         # self.port = mido.open_input(port_name, callback=lambda m : self.on_message(m))
+        self.q = q
         self.port = mido.open_input(port_name)
         self.point = q.createSource(point)
         self.clock = None if clock is None else q.createSource(clock)    
+        self.is_patched = None
 
     def process(self):
+        if self.is_patched is None:
+            self.is_patched = self.q.isPatched(self.point) or self.q.isPatched(self.clock)
+        if not self.is_patched:
+            return False
         new_events = False
         if self.port:
             for msg in self.port.iter_pending():
@@ -334,7 +340,7 @@ class MidiServer:
             TWISTER_CONTROLLER: self.sink("controller_tw_sink", FighterTwister(self).handle),
             AKAIMIDIMIX_CONTROLLER: self.sink("controller_mm_sink", AkaiMidiMix(self).handle)}
 
-        self.repaint = True
+        self.displayprops = {'current_program':-1, 'bpm':-1}
 
         #
         # Wire up the CLOCK and QUEUE
@@ -385,20 +391,24 @@ class MidiServer:
 
     def update_display(self,repaint=False):
         #TODO check if current_program or bpm have changed
+        bpm = "ext"
         if self.internal_clock:
-            self.screen.right(0,75,str(self.internal_clock.bpm))
-        else:
-            self.screen.right(0,75,"ext")
-        for i in range(0,len(self.programs)):
-            row = i*8+1
-            self.screen.right(row,1,str(i),pad=2)
-            self.screen.write(row,4,self.programs[i].get_display_name())
-            if i==self.current_program:
-                for r in range(row,row+7):
-                    self.screen.write(r,0,'|',eol=False)
-            else:
-                for r in range(row,row+7):
-                    self.screen.write(r,0,' ',eol=False)
+            bpm = str(self.internal_clock.bpm)
+        if bpm != self.displayprops['bpm']:
+            self.screen.right(0,75,bpm)
+            self.displayprops['bpm'] = bpm
+        if self.current_program != self.displayprops['current_program']:
+            self.displayprops['current_program'] = self.current_program
+            for i in range(0,len(self.programs)):
+                row = i*8+1
+                self.screen.right(row,1,str(i),pad=2)
+                self.screen.write(row,4,self.programs[i].get_display_name())
+                if i==self.current_program:
+                    for r in range(row,row+7):
+                        self.screen.write(r,0,'|',eol=False)
+                else:
+                    for r in range(row,row+7):
+                        self.screen.write(r,0,' ',eol=False)
 
 
     async def render_display(self, force=False):
@@ -603,7 +613,7 @@ class MidiServer:
             if not did_something:
                 self.update_display()
                 await self.render_display()
-            await asyncio.sleep(0.001 if did_something else 0)
+            await asyncio.sleep(0.005 if did_something else 0.001)
         finally:
             pass
 

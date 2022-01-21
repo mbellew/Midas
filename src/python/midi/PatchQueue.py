@@ -55,6 +55,19 @@ class PatchQueue:
             self.queue.set_time(event.obj.time)
 
 
+    def isPatched(self, source):
+        if self.stringType == type(source):
+            source = self.getPoint(source, SOURCE_POINT)
+        if not source:
+            return False
+        if source.handler:
+            return True
+        if not source.name in self.patches:
+            return False
+        patches = self.patches[source.name]
+        return patches is not None and len(patches) > 0
+
+
     def createSink(self, sink, handler=None):
         return self.createPoint(sink, SINK_POINT, handler)
 
