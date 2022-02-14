@@ -12,7 +12,8 @@ q = app.patchQueue
 # CLOCK
 #
 
-app.useExternalClock('IAC Driver Bus 1_clock')
+app.useExternalClock('IAC Driver Bus 1_clock')  # OSX
+app.useExternalClock('loopMIDI Port 0_clock')   # Windows
 # app.useInternalClock(120)
 
 
@@ -42,7 +43,8 @@ OneNoteSequencer(q, "drone")
 #
 
 # TODO app.hasDevice('name')
-output_device = 'IAC Driver Bus 1_sink'
+#output_device = 'IAC Driver Bus 1_sink'    # Windows
+output_device = 'loopMIDI Port 1_sink'      # OSX
 bootsOut = app.setupOutputChannel(CH5, output_device, name="BOOTS")
 droneOut = app.setupOutputChannel(CH8, output_device, name="DRONE")
 arpOut = app.setupOutputChannel(CH9, output_device, name="ARP")
@@ -79,9 +81,9 @@ app.patch('drone_out', droneOut)
 
 
 # app.patch('Arturia BeatStep_in', 'debug')
-#app.patch(app.getOutputChannel(CH8).output_source, 'debug')
-#app.patch(app.getOutputChannel(CH7).output_source, 'debug')
-#app.patch(app.getOutputChannel(CH10).output_source, 'debug')
-app.patch("Artiphon Orba MIDI_in", 'debug')
+app.patch(app.getOutputChannel(CH8).output_source, 'debug')
+app.patch(app.getOutputChannel(CH7).output_source, 'debug')
+app.patch(app.getOutputChannel(CH10).output_source, 'debug')
+app.patch("Midas_clock", 'debug')
 
 Application.run()

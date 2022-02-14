@@ -471,6 +471,7 @@ class MidiServer:
     def findMidiInputs(self):
         q = self.patchQueue
         names_list = mido.get_input_names()
+        print("IN:  ", names_list)
 
         # mido.get_input_names() returns duplicates!  so remove them
         names = {}
@@ -486,8 +487,10 @@ class MidiServer:
                 step = MidiInputStep(q, name, name + "_in", name + "_clock")
                 # We don't need to do this if MidiInputStep uses callback
                 self.steps.append(step)
-            except:
-                print("ERROR: failed to open port '" + name + "'")
+                print("open '" + name + "' for input succeeded")
+            except Exception as ex:
+                print("ERROR: failed to open input port '" + name + "'")
+                print(ex)
                 continue
 
         # create "keyboard" source
@@ -538,8 +541,8 @@ class MidiServer:
 
     def findMidiOutputs(self):
         q = self.patchQueue
-        names_list = mido.get_input_names()
-        print(names_list)
+        names_list = mido.get_output_names()
+        print("OUT: ", names_list)
 
         # mido.get_input_names() returns duplicates!  so remove them
         names = {}
@@ -550,8 +553,9 @@ class MidiServer:
         for name in names:
             try:
                 MidiOutModule(q, name + "_sink", mido.open_output(name))
+                print("open '" + name + "' for output succeeded")
             except Exception as ex:
-                print("ERROR: failed to open port '" + name + "'")
+                print("ERROR: failed to open output port '" + name + "'")
                 print(ex)
                 continue
 

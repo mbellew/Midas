@@ -5,19 +5,29 @@
     "version": "0.2.0",
     "configurations": [
 
+            {
+            "name": "Python: Ableton.py",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}/src/python/Ableton.py",
+            "console": "integratedTerminal",
+            "justMyCode": false
+        },
         {
             "name": "Python: KorgConcert.py",
             "type": "python",
             "request": "launch",
-            "program": "/Users/matthewb/Midas/src/python/KorgConcert.py",
-            "console": "integratedTerminal"
+            "program": "${workspaceFolder}/src/python/KorgConcert.py",
+            "console": "integratedTerminal",
+            "justMyCode": false
         },
         {
             "name": "Python: Current File",
             "type": "python",
             "request": "launch",
             "program": "${file}",
-            "console": "integratedTerminal"
+            "console": "integratedTerminal",
+            "justMyCode": false
         }
 
     ]
